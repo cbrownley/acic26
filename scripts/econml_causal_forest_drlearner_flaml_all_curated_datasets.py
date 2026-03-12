@@ -20,7 +20,7 @@ from flaml import AutoML
 TEAM_ID = "the_unconfounded"
 SUBMISSION_ID = "2"
 INPUT_DIR = "../data/inputs/curated_data"
-OUTPUT_DIR = "../data/outputs/causal_forest_rlearner_flaml"
+OUTPUT_DIR = "../data/outputs/causal_forest_drlearner_flaml"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 TREATMENTS = ["b","c","d","e"]
