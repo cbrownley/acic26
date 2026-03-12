@@ -10,7 +10,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
 
 from econml.dml import CausalForestDML
-from econml.metalearners import RLearner
+from econml.dr import DRLearner
 
 from flaml import AutoML
 
@@ -96,21 +96,24 @@ def process_dataset(file):
     cf_lb, cf_ub = cf.effect_interval(Xp)
 
     # -----------------------------
-    # R-learner hybrid
+    # DRLearner hybrid
     # -----------------------------
-    rlearner = RLearner(model_regression=model_y, model_propensity=model_t)
-    rlearner.fit(Y=y, T=T, X=Xp)
-    r_cate = rlearner.effect(Xp)
-    r_lb = r_cate - np.std(r_cate)*1.96
-    r_ub = r_cate + np.std(r_cate)*1.96
+    dr = DRLearner(
+        model_regression=model_y,
+        model_propensity=model_t
+    )
+    dr.fit(Y=y, T=T, X=Xp)
+    dr_cate = dr.effect(Xp)
+    dr_lb = dr_cate - np.std(dr_cate, axis=0) * 1.96
+    dr_ub = dr_cate + np.std(dr_cate, axis=0) * 1.96
 
     # -----------------------------
     # Ensemble stacking
     # -----------------------------
-    cate_stack = np.stack([cf_cate, r_cate])
+    cate_stack = np.stack([cf_cate, dr_cate])
     cate_mean = np.mean(cate_stack, axis=0)
-    lb_stack = np.stack([cf_lb, r_lb])
-    ub_stack = np.stack([cf_ub, r_ub])
+    lb_stack = np.stack([cf_lb, dr_lb])
+    ub_stack = np.stack([cf_ub, dr_ub])
     lb_mean = np.mean(lb_stack, axis=0)
     ub_mean = np.mean(ub_stack, axis=0)
 
