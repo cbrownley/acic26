@@ -2,36 +2,52 @@ name: acic_env
 
 channels:
   - conda-forge
-  - defaults
 
 dependencies:
+
   # Python
   - python=3.11
 
-  # Core scientific stack (conda handles compiled binaries better)
+  # Core stack
   - numpy=1.26
   - pandas=2.1
   - scipy=1.11
   - scikit-learn=1.3
-  - statsmodels
-  - joblib
+  - statsmodels=0.14
+  - patsy
+  - tabulate
 
-  # ML libraries
-  - lightgbm
-  - xgboost
-  - catboost
+  # ML
+  - lightgbm=4
+  - xgboost=2
+  - catboost=1.2
+  - flaml
+  - shap
+  - scikit-learn-intelex
 
   # Visualization
-  - matplotlib
+  - matplotlib=3.8
   - seaborn
   - plotly
   - tqdm
 
-  # Data utilities
+  # Data
   - pyarrow
   - openpyxl
+  - xlrd
 
-  # Notebook environment
+  # Graph / DAG tools
+  - graphviz
+  - python-graphviz
+  - pydot
+  - networkx
+
+  # Performance
+  - numba=0.58
+  - dask
+  - joblib
+
+  # Notebooks
   - jupyterlab
   - notebook
   - ipykernel
@@ -42,22 +58,13 @@ dependencies:
   - isort
   - flake8
   - pylint
+  - pre-commit
 
-  # Performance utilities
-  - numba
-  - dask
-
-  # Required for pip installs
+  # Misc utilities
+  - sympy
   - pip
 
+  # Pip packages
   - pip:
-      # Core causal inference libraries
       - econml
-      - dowhy
-      - causalml
-
-      # Helpful utilities
-      - graphviz
-      - shap
-      - optuna
-
+      - doubleml
