@@ -1,0 +1,195 @@
+# Ignore files in data inputs
+data/inputs/curated_data/*
+data/inputs/full_data/*
+
+# Ignore files in outputs
+data/outputs/eda/*
+data/outputs/the_unconfounded_submission1/*
+data/outputs/the_unconfounded_submission2/*
+data/outputs/the_unconfounded_submission3/*
+data/outputs/the_unconfounded_submission4/*
+data/outputs/the_unconfounded_submission5/*
+
+# Keep the directories themselves (optional if using .gitkeep)
+!data/inputs/curated_data/.gitkeep
+!data/inputs/full_data/.gitkeep
+!data/outputs/eda/.gitkeep
+!data/outputs/the_unconfounded_submission1/.gitkeep
+!data/outputs/the_unconfounded_submission2/.gitkeep
+!data/outputs/the_unconfounded_submission3/.gitkeep
+!data/outputs/the_unconfounded_submission4/.gitkeep
+!data/outputs/the_unconfounded_submission5/.gitkeep
+
+# ======================================================
+
+# Python / Machine Learning / Data Science .gitignore
+
+# ======================================================
+
+# -------------------------
+
+# Python bytecode / caches
+
+# -------------------------
+
+**pycache**/
+*.py[cod]
+*$py.class
+
+# -------------------------
+
+# C extensions
+
+# -------------------------
+
+*.so
+
+# -------------------------
+
+# Distribution / packaging
+
+# -------------------------
+
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# -------------------------
+
+# Virtual environments
+
+# -------------------------
+
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+conda-env/
+*.conda
+
+# -------------------------
+
+# Jupyter Notebook
+
+# -------------------------
+
+.ipynb_checkpoints/
+
+# -------------------------
+
+# Python testing / coverage
+
+# -------------------------
+
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# -------------------------
+
+# Logs
+
+# -------------------------
+
+*.log
+
+# -------------------------
+
+# IDE / Editor files
+
+# -------------------------
+
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# -------------------------
+
+# macOS system files
+
+# -------------------------
+
+.DS_Store
+
+# -------------------------
+
+# Data folders (large data)
+
+# -------------------------
+
+data/inputs/curated_data/*
+data/inputs/full_data/*
+data/outputs/eda/*
+data/outputs/the_unconfounded_submission*/*
+
+# -------------------------
+
+# Keep folder structure
+
+# -------------------------
+
+!data/inputs/curated_data/.gitkeep
+!data/inputs/full_data/.gitkeep
+!data/outputs/eda/.gitkeep
+!data/outputs/the_unconfounded_submission*/.gitkeep
+
+# -------------------------
+
+# ML experiment artifacts
+
+# -------------------------
+
+*.pkl
+*.joblib
+*.model
+*.h5
+*.pt
+*.pth
+
+# -------------------------
+
+# Temporary files
+
+# -------------------------
+
+tmp/
+temp/
+*.tmp
+
+# -------------------------
+
+# Large datasets
+
+# -------------------------
+
+*.csv
+*.parquet
+*.feather
+*.hdf5
+*.h5
+
+# -------------------------
+
+# Environment files
+
+# -------------------------
+
+.env
+.env.local
+.env.*
+
+# -------------------------
+
+# Misc
+
+# -------------------------
+
+*.bak
+*.old
+
