@@ -10,7 +10,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
 
 from econml.dml import CausalForestDML
-from econml.rlearner import RLearner
+from econml.metalearners import RLearner
 
 from flaml import AutoML
 
