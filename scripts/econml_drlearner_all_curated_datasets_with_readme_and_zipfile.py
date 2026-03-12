@@ -23,7 +23,7 @@ x_col = "x"
 output_dir = f"ACIC_submission_team{teamID}_{submissionID}"
 os.makedirs(output_dir, exist_ok=True)
 
-n_bootstrap = 200
+n_bootstrap = 100
 n_jobs = -1
 
 # ----------------------------
