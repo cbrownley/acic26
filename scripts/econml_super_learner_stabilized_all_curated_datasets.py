@@ -18,11 +18,11 @@ from econml.dml import CausalForestDML, NonParamDML
 # -------------------------------
 # CONFIG
 # -------------------------------
-TEAM_ID = "the_unconfounded"
+TEAM_ID = "1"
 SUBMISSION_ID = "1"
 
 INPUT_DIR = "../data/inputs/curated_data"
-OUTPUT_DIR = f"../data/outputs/super_learner_stabilized"
+OUTPUT_DIR = f"../data/outputs/super_learner_stabilized_team{TEAM_ID}_submission{SUBMISSION_ID}"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 TREATMENTS = ["b", "c", "d", "e"]
@@ -179,10 +179,10 @@ def process_dataset(file):
     })
     scate_df.to_csv(f"{OUTPUT_DIR}/sCATE_{dataset_id}_{TEAM_ID}_{SUBMISSION_ID}.csv", index=False)
 
-    # Subgroup CATE (subCATE) on x1
+    # Subgroup CATE (subCATE) on x12
     sub_rows = []
     for g in [0,1]:
-        idx = df["x1"] == g
+        idx = df["x12"] == g
         for i, treat in enumerate(TREATMENTS):
             sub_rows.append({
                 "z": treat,

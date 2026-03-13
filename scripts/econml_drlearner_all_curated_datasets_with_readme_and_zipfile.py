@@ -18,9 +18,9 @@ dataIDs = [f"{i:01d}" for i in range(1, 19)]
 treatments = ['b', 'c', 'd', 'e']
 control = 'a'
 subgroups = [0, 1]
-x_col = "x"
+x_col = "x12"
 
-output_dir = f"ACIC_submission_team{teamID}_{submissionID}"
+output_dir = f"../data/outputs/econml_drlearner_team{teamID}_submission{submissionID}"
 os.makedirs(output_dir, exist_ok=True)
 
 n_bootstrap = 100

@@ -17,10 +17,10 @@ from flaml import AutoML
 # ------------------------------------------------
 # CONFIG
 # ------------------------------------------------
-TEAM_ID = "the_unconfounded"
-SUBMISSION_ID = "2"
-INPUT_DIR = "../data/inputs/curated_data/data_1.csv"
-OUTPUT_DIR = "../data/outputs/causal_forest_drlearner_flaml"
+TEAM_ID = "1"
+SUBMISSION_ID = "1"
+INPUT_DIR = "../data/inputs/curated_data"
+OUTPUT_DIR = f"../data/outputs/causal_forest_drlearner_flaml_team{TEAM_ID}_submission{SUBMISSION_ID}"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 TREATMENTS = ["b","c","d","e"]
@@ -152,7 +152,7 @@ def process_dataset(file):
     # ------------------------------------------
     rows = []
     for g in [0, 1]:
-        idx = df["x1"] == g
+        idx = df["x12"] == g
         for i, treat in enumerate(TREATMENTS):
             rows.append({
                 "z": treat,
@@ -185,7 +185,7 @@ def process_dataset(file):
 
     best_rows = []
     for g in [0, 1]:
-        sub = sub_df[sub_df["x"] == g]
+        sub = sub_df[sub_df["x12"] == g]
         best_rows.append({
             "x": g,
             "best_z": sub.loc[sub["Estimate"].idxmax(), "z"]
