@@ -33,7 +33,7 @@ TEAM_ID = "1"
 SUBMISSION_ID = "1"
 
 INPUT_DIR = "../data/inputs/curated_data"
-OUTPUT_DIR = f"econml_super_learner_team{TEAM_ID}_submission{SUBMISSION_ID}"
+OUTPUT_DIR = f"../data/outputs/econml_super_learner_team{TEAM_ID}_submission{SUBMISSION_ID}"
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -209,7 +209,7 @@ def save_submission_files(dataID,iCATE_df,data):
 
     sCATE_df=pd.DataFrame(sCATE_rows)
 
-    sfile=f"sCATE_data{dataID}_team{TEAM_ID}_{SUBMISSION_ID}.csv"
+    sfile=f"sCATE_data{dataID}_team{TEAM_ID}_submission{SUBMISSION_ID}.csv"
     sCATE_df.to_csv(os.path.join(OUTPUT_DIR,sfile),index=False)
 
     files.append(sfile)
@@ -237,7 +237,7 @@ def save_submission_files(dataID,iCATE_df,data):
 
     subCATE_df=pd.DataFrame(sub_rows)
 
-    subfile=f"subCATE_data{dataID}_team{TEAM_ID}_{SUBMISSION_ID}.csv"
+    subfile=f"subCATE_data{dataID}_team{TEAM_ID}_submission{SUBMISSION_ID}.csv"
 
     subCATE_df.to_csv(os.path.join(OUTPUT_DIR,subfile),index=False)
 
@@ -249,7 +249,7 @@ def save_submission_files(dataID,iCATE_df,data):
 
     PATE_df=sCATE_df.copy()
 
-    pfile=f"PATE_data{dataID}_team{TEAM_ID}_{SUBMISSION_ID}.csv"
+    pfile=f"PATE_data{dataID}_team{TEAM_ID}_submission{SUBMISSION_ID}.csv"
 
     PATE_df.to_csv(os.path.join(OUTPUT_DIR,pfile),index=False)
 
@@ -259,7 +259,7 @@ def save_submission_files(dataID,iCATE_df,data):
     # iCATE
     # --------------------
 
-    icfile=f"iCATE_data{dataID}_team{TEAM_ID}_{SUBMISSION_ID}.csv"
+    icfile=f"iCATE_data{dataID}_team{TEAM_ID}_submission{SUBMISSION_ID}.csv"
 
     iCATE_df.to_csv(os.path.join(OUTPUT_DIR,icfile),index=False)
 
@@ -273,7 +273,7 @@ def save_submission_files(dataID,iCATE_df,data):
 
     best_i["best_z"]=best_i[treatments].idxmax(axis=1)
 
-    best_file=f"BEST_iCATE_data{dataID}_team{TEAM_ID}_{SUBMISSION_ID}.csv"
+    best_file=f"BEST_iCATE_data{dataID}_team{TEAM_ID}_submission{SUBMISSION_ID}.csv"
 
     best_i[["best_z"]].to_csv(os.path.join(OUTPUT_DIR,best_file))
 
@@ -285,7 +285,7 @@ def save_submission_files(dataID,iCATE_df,data):
 
     best_s=sCATE_df.loc[sCATE_df["Estimate"].idxmax(),"z"]
 
-    best_s_file=f"BEST_sCATE_data{dataID}_team{TEAM_ID}_{SUBMISSION_ID}.csv"
+    best_s_file=f"BEST_sCATE_data{dataID}_team{TEAM_ID}_submission{SUBMISSION_ID}.csv"
 
     pd.DataFrame({"best_z":[best_s]}).to_csv(
         os.path.join(OUTPUT_DIR,best_s_file),
@@ -308,7 +308,7 @@ def save_submission_files(dataID,iCATE_df,data):
 
         best_sub_rows.append({"x":x_val,"best_z":best_z})
 
-    best_sub_file=f"BEST_subCATE_data{dataID}_team{TEAM_ID}_{SUBMISSION_ID}.csv"
+    best_sub_file=f"BEST_subCATE_data{dataID}_team{TEAM_ID}_submission{SUBMISSION_ID}.csv"
 
     pd.DataFrame(best_sub_rows).to_csv(
         os.path.join(OUTPUT_DIR,best_sub_file),
@@ -323,7 +323,7 @@ def save_submission_files(dataID,iCATE_df,data):
 
     best_p=PATE_df.loc[PATE_df["Estimate"].idxmax(),"z"]
 
-    best_p_file=f"BEST_PATE_data{dataID}_team{TEAM_ID}_{SUBMISSION_ID}.csv"
+    best_p_file=f"BEST_PATE_data{dataID}_team{TEAM_ID}_submission{SUBMISSION_ID}.csv"
 
     pd.DataFrame({"best_z":[best_p]}).to_csv(
         os.path.join(OUTPUT_DIR,best_p_file),
