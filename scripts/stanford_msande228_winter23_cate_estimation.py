@@ -34,6 +34,65 @@ plot = True # whether to plot results
 # hetero_feats = ['inc'] # list of subset of features to be used for CATE model or the string 'all' for everything
 binary_y = False
 
+import pandas as pd
+from sklearn.preprocessing import OneHotEncoder
+
+def get_data():
+
+    # -----------------------------
+    # Load CSV
+    # -----------------------------
+    path = "../data/inputs/curated_data/data_1.csv"
+    df = pd.read_csv(path)
+
+    # -----------------------------
+    # Outcome
+    # -----------------------------
+    y = df["y"].values
+
+    # -----------------------------
+    # Treatment
+    # z = categorical {a,b,c,d,e}
+    # Convert to binary treatment
+    # (example: a = 0 ; b,c,d,e = 1)
+    # -----------------------------
+    z_map = {"a":0, "b":1, "c":1, "d":1, "e":1}
+    D = df["z"].map(z_map).values
+
+    # -----------------------------
+    # Feature columns
+    # -----------------------------
+    feature_cols = [f"x{i}" for i in range(1,41)]
+    X = df[feature_cols].copy()
+
+    # -----------------------------
+    # Categorical features
+    # x1–x6 are nominal levels
+    # -----------------------------
+    cat_cols = [f"x{i}" for i in range(1,7)]
+
+    # One-hot encode them
+    X = pd.get_dummies(X, columns=cat_cols, drop_first=True)
+
+    # -----------------------------
+    # Ensure numeric matrix
+    # -----------------------------
+    X = X.astype(float)
+
+    # -----------------------------
+    # No group structure
+    # -----------------------------
+    # sanitize column names so formulaic works
+    X.columns = (
+        X.columns
+        .str.replace("cat__", "", regex=False)
+        .str.replace("num__", "", regex=False)
+        .str.replace(" ", "_", regex=False)
+    )
+
+    groups = None
+    return X, D, y, groups
+
 X, D, y, groups = get_data()
 
 # Split Train and Validation and Test
