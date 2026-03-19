@@ -1,6 +1,7 @@
 # Ignore files in data inputs
 data/inputs/curated_data/*
 data/inputs/full_data/*
+acic26_claude/curated_data/*
 
 # Ignore files in outputs
 data/outputs/eda/*
@@ -9,6 +10,8 @@ data/outputs/the_unconfounded_submission2/*
 data/outputs/the_unconfounded_submission3/*
 data/outputs/the_unconfounded_submission4/*
 data/outputs/the_unconfounded_submission5/*
+acic26_claude/plots/*
+acic26_claude/submissions/*
 
 # Keep the directories themselves (optional if using .gitkeep)
 !data/inputs/curated_data/.gitkeep
@@ -19,6 +22,8 @@ data/outputs/the_unconfounded_submission5/*
 !data/outputs/the_unconfounded_submission3/.gitkeep
 !data/outputs/the_unconfounded_submission4/.gitkeep
 !data/outputs/the_unconfounded_submission5/.gitkeep
+!acic26_claude/plots/.gitkeep
+!acic26_claude/submissions/.gitkeep
 
 # ======================================================
 
@@ -192,4 +197,5 @@ temp/
 
 *.bak
 *.old
+*.zip
 
