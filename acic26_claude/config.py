@@ -1,88 +1,190 @@
 """
 config.py
 All tuneable knobs in one place. Import this module everywhere.
-To run a quick experiment, change a value here — nothing else needs touching.
 
-New in v2
----------
-USE_AUTOML             : swap stacked sklearn models for FLAML AutoML
-AUTOML_TIME_BUDGET_REG : seconds FLAML searches for regression tasks
-AUTOML_TIME_BUDGET_CLF : seconds FLAML searches for classification tasks
-USE_IF_CI              : add LinearDRLearner with IF-based CIs as a third
-                         estimator in the variance-weighted ensemble
-N_PARALLEL_DATASETS    : number of datasets to process simultaneously;
-                         set to 1 to disable parallel processing
-N_BOOT                 : reduced from 300 to 100 because the nonlinear
-                         DRLearner is now one of three ensemble members
-                         rather than the sole source of CIs
+v4 changes
+----------
+- USE_AUTOML now defaults to False. A fixed LightGBM-primary stack is
+  4-6x faster than sklearn GBM and comparably accurate, removing the
+  need for FLAML's unpredictable search overhead in most cases. Set
+  True only when you have a large time budget and want FLAML to search
+  beyond the LightGBM defaults.
+- LightGBM hyperparameter blocks replace the old GBM_N_TREES / RF_N_TREES
+  blocks. LightGBM's leaf-wise growth + GOSS + EFB gives sklearn-GBM-
+  quality predictions at roughly 5-10x the speed.
+- N_BOOT reduced to 50. With LightGBM nuisance models the pseudo-outcomes
+  are cleaner, so fewer bootstrap replicates are needed to stabilise CIs.
+  The linear DRL (influence-function) and CausalForest provide independent
+  CI estimates that jointly anchor the variance-weighted ensemble.
+
+v5 changes  (from analysis of dr_r_cf_ensemble_var_weighted)
+-------------------------------------------------------------
+- CF_DISCRETE_TREATMENT = True.  CausalForestDML's arm-vs-control contrasts
+  use a 0/1 treatment indicator; setting discrete_treatment=True tells
+  the forest to use a classifier for its internal propensity model instead
+  of a regressor.  Omitting this flag causes the forest to fit a continuous
+  regression on a binary variable, producing biased propensity scores and
+  systematically over-smoothed CATE estimates.
+
+- SE_FLOOR_FACTOR = 0.1.  The per-observation inverse-variance weights in
+  the ensemble use each estimator's CI width as the SE.  With MIN_SE = 1e-6
+  (the prior floor), a single observation with an artificially tight
+  bootstrap CI receives ~10^12 times the weight of an average observation,
+  collapsing the ensemble to a single estimator at that point.
+  The new floor sets SE_k(x_i) >= SE_FLOOR_FACTOR * std(tau_k), which
+  caps the maximum precision ratio across observations at (1/0.1)^2 = 100.
+  This makes the per-obs weighting robust without abandoning its
+  observation-level adaptivity advantage over global variance weighting.
 """
+
 from pathlib import Path
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 DATA_DIR = Path("curated_data")
-OUT_DIR  = Path("submissions")
+OUT_DIR = Path("submissions")
 
 # ── Competition identifiers ───────────────────────────────────────────────────
-TEAM_ID  = "the_unconfounded"
-SUBM_ID  = "1"
+TEAM_ID = "the_unconfounded"
+SUBM_ID = "1"
 
 # ── Treatment arms ────────────────────────────────────────────────────────────
-CONTROL    = "a"
+CONTROL = "a"
 TREATMENTS = ["b", "c", "d", "e"]
-ALL_ARMS   = [CONTROL] + TREATMENTS
+ALL_ARMS = [CONTROL] + TREATMENTS
 
 # ── Cross-fitting / inference ─────────────────────────────────────────────────
 N_CV_FOLDS = 5
-N_BOOT     = 100     # bootstrap replicates — only used when USE_AUTOML=False
-
-# ── AutoML / bootstrap compatibility ─────────────────────────────────────────
-# FLAML's internal trial runner is not thread-safe: it returns None when
-# called from a joblib thread, causing AttributeError inside tune.run().
-# BootstrapInference(n_jobs=-1) spawns threads, which triggers this crash.
-#
-# When USE_AUTOML=True we therefore skip BootstrapInference on the nonlinear
-# DRLearner entirely.  CIs still come from two sources:
-#   • LinearDRLearner  — influence-function (sandwich) CIs, O(n), exact
-#   • CausalForestDML  — GRF honesty-based variance, exact
-# The nonlinear DRL still contributes its point estimate to the ensemble
-# via ENSEMBLE_W_AUTOML_NOBOOT (a fixed conservative weight).
-#
-# When USE_AUTOML=False (sklearn stacked models), sklearn estimators ARE
-# thread-safe so BootstrapInference works normally.
-AUTOML_BOOTSTRAP      = False   # always False when USE_AUTOML=True; set True
-                                 # only if you replace FLAML with a thread-safe
-                                 # AutoML backend (e.g. auto-sklearn 2)
-ENSEMBLE_W_AUTOML_NOBOOT = 0.25  # conservative weight for the no-CI DRL term
-ALPHA      = 0.05    # => 95% intervals
+N_BOOT = 50  # LightGBM nuisance → cleaner pseudo-outcomes → fewer reps needed
+ALPHA = 0.05  # => 95% intervals
 
 # ── Variance-weighted ensemble ────────────────────────────────────────────────
-# Point estimate and CI both computed from:
-#   (1) NonlinearDRLearner  — N_BOOT bootstrap CIs
-#   (2) LinearDRLearner     — influence-function (sandwich) CIs  [if USE_IF_CI]
-#   (3) CausalForestDML     — honesty-based GRF CIs
-# Weight for estimator k at observation i: w_k(x_i) = 1 / sigma_k^2(x_i)
-# Ensemble variance: sigma_ens^2 = 1 / sum_k w_k(x_i)
-USE_IF_CI  = True    # set False to drop the LinearDRLearner (faster, less safe)
+# Three estimators combined via inverse-variance weighting per observation:
+#   (1) NonlinearDRLearner  — LightGBM CATE stage, bootstrap CIs
+#   (2) LinearDRLearner     — polynomial features, IF sandwich CIs  [USE_IF_CI]
+#   (3) CausalForestDML     — GRF honesty-based variance
+USE_IF_CI = True
 
-# ── AutoML ────────────────────────────────────────────────────────────────────
-USE_AUTOML             = True  # False falls back to v1 stacked sklearn models
-AUTOML_TIME_BUDGET_REG = 60    # seconds per AutoML regression task
-AUTOML_TIME_BUDGET_CLF = 60    # seconds per AutoML classification task
-# FLAML searches over LightGBM, XGBoost, RF, ExtraTree, etc. automatically.
-# Increase budgets for larger datasets or when runtime permits.
+# When USE_AUTOML=True the nonlinear DRL has no bootstrap CIs (FLAML uses
+# multiprocessing, which conflicts with BootstrapInference's threading).
+# In that case the DRL point estimate is blended with this fixed weight;
+# the CI computation uses only LinearDRL + CausalForest.
+ENSEMBLE_W_AUTOML_NOBOOT = 0.25
 
-# ── Fallback sklearn hyperparameters (used when USE_AUTOML = False) ───────────
-GBM_N_TREES   = 250
-RF_N_TREES    = 250
-CF_N_TREES    = 500
-MIN_LEAF      = 5
-MIN_LEAF_CATE = 10
+# ── Model backend ─────────────────────────────────────────────────────────────
+# False (default): LightGBM-primary stacked ensemble — fast, reproducible
+# True           : FLAML AutoML search — use only with large time budgets
+USE_AUTOML = False
+
+# ── LightGBM hyperparameters (used when USE_AUTOML = False) ───────────────────
+# Note: feature_name is intentionally NOT set here.  Setting it on the
+# sklearn estimator causes LightGBM to warn that the param is ignored
+# (it belongs on the Dataset constructor, not the estimator).
+# Instead, models.py wraps every LGBMRegressor/LGBMClassifier in a
+# Pipeline([("to_numpy", ...), ("lgbm", ...)]) that converts any
+# DataFrame to a plain ndarray before it reaches LightGBM, eliminating
+# the sklearn "X does not have valid feature names" warning at source.
+
+# Outcome / CATE regression
+LGBM_REG = dict(
+    n_estimators=300,
+    max_depth=-1,  # unlimited depth; controlled by num_leaves
+    num_leaves=63,  # 2^6-1; good default for tabular data
+    learning_rate=0.05,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    min_child_samples=10,
+    n_jobs=-1,  # overridden per-worker by main.py
+    verbosity=-1,
+    random_state=42,
+)
+# Propensity classification
+LGBM_CLS = dict(
+    n_estimators=300,
+    num_leaves=63,
+    learning_rate=0.05,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    min_child_samples=10,
+    n_jobs=-1,
+    verbosity=-1,
+    random_state=42,
+)
+# CausalForest nuisance (lighter — forest orthogonalisation is less
+# sensitive to propensity quality than DR pseudo-outcome construction)
+LGBM_REG_CF = dict(
+    n_estimators=200,
+    num_leaves=31,
+    learning_rate=0.05,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    min_child_samples=10,
+    n_jobs=-1,
+    verbosity=-1,
+    random_state=42,
+)
+
+# ── CausalForest ─────────────────────────────────────────────────────────────
+CF_N_TREES = 500
+
+# discrete_treatment=True: use a classifier (not regressor) for the forest's
+# internal propensity model.  Correct for binary arm-vs-control contrasts.
+# Sourced from dr_r_cf_ensemble_var_weighted — our prior code left this unset,
+# causing CausalForestDML to fit a continuous regression on a 0/1 variable.
+CF_DISCRETE_TREATMENT = True
+
+# ── Ensemble SE floor ─────────────────────────────────────────────────────────
+# Per-observation inverse-variance weights are floored so that
+#   SE_k(x_i) >= SE_FLOOR_FACTOR * std(tau_k)
+# This prevents any single observation from receiving disproportionate weight
+# due to an artificially tight CI from a small bootstrap sample.
+# 0.1 caps the max precision ratio across observations at 100:1.
+SE_FLOOR_FACTOR = 0.1
+
+# ── AutoML (used only when USE_AUTOML = True) ─────────────────────────────────
+AUTOML_TIME_BUDGET_REG = 60
+AUTOML_TIME_BUDGET_CLF = 60
+
+# ── Bootstrap / inference ─────────────────────────────────────────────────────
+# USE_BOOTSTRAP controls whether the NonlinearDRLearner attaches
+# BootstrapInference (N_BOOT refits of the full CATE model).
+#
+# True  (default): bootstrap CIs from DRLearner + analytic CIs from
+#                  LinearDRLearner / CausalForest / ForestDRLearner are all
+#                  combined in the variance-weighted ensemble.
+#
+# False (fast):    DRLearner still contributes its point estimate to the
+#                  ensemble (with weight ENSEMBLE_W_AUTOML_NOBOOT), but CIs
+#                  come entirely from the three analytic estimators:
+#                    - LinearDRLearner  → HC1 sandwich / influence function
+#                    - CausalForestDML  → GRF honest variance
+#                    - ForestDRLearner  → GRF honest variance
+#                  These are closed-form, essentially free after fitting, and
+#                  asymptotically valid under their respective assumptions.
+#                  Use --no-bootstrap at the CLI to set this at runtime.
+USE_BOOTSTRAP = True
+
+# Whether to attach BootstrapInference to the nonlinear DRLearner when
+# USE_AUTOML=True.  Default False because FLAML internally spawns its own
+# subprocesses and is not safe to call from inside joblib threads
+# (BootstrapInference uses joblib).  Set True only if you have confirmed
+# that your FLAML version and OS handle nested parallelism without error.
+AUTOML_BOOTSTRAP = False
 
 # ── Parallel dataset processing ───────────────────────────────────────────────
-N_PARALLEL_DATASETS = 4   # concurrent datasets in run_batch_parallel
-                           # set to 1 for sequential (debug-friendly) mode
-# When N_PARALLEL_DATASETS > 1, each worker uses INNER_N_JOBS internally
-# to avoid CPU oversubscription.  When = 1, n_jobs=-1 is used.
-INNER_N_JOBS = -1          # overridden automatically inside run_batch_parallel
+N_PARALLEL_DATASETS = 4
+INNER_N_JOBS = -1  # overridden automatically inside run_batch_parallel
 
 RANDOM_STATE = 42
+
+# ── Propensity score clipping ─────────────────────────────────────────────────
+# DR pseudo-outcome = (1(T=t)/pi_t - 1(T=0)/pi_0) * (Y - mu)
+# Near-zero propensities amplify noise by 1/pi — clip before inversion.
+# 0.025 is the Crump et al. (2009) standard; 0.01 for looser trimming.
+PROPENSITY_CLIP = 0.025
+
+# ── ForestDRLearner ───────────────────────────────────────────────────────────
+# 4th ensemble member: DR pseudo-outcomes fed into an honest causal forest.
+# Combines DR's double-robustness with GRF's honest CI — no bootstrap needed.
+USE_FOREST_DRL = True
+FDRL_N_TREES = 500
+FDRL_MIN_LEAF = 5

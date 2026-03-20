@@ -17,25 +17,42 @@ sigma_k^2 is derived from each estimator's 95% interval:
 
 When USE_IF_CI = False only two estimators are combined (DRL + CF).
 
+v5 change: SE floor in _variance_weighted_combine
+--------------------------------------------------
+Prior code used MIN_SE = 1e-6, effectively zero.  A bootstrap run returning
+a very tight CI for one observation would give that point near-infinite
+precision weight, collapsing the ensemble to a single estimator locally.
+
+New floor: SE_k(x_i) >= SE_FLOOR_FACTOR * std(tau_k_all)
+This caps the max precision ratio at (1/SE_FLOOR_FACTOR)^2 = 100 while
+preserving the observation-level adaptivity that makes per-obs weighting
+superior to the global scalar weights used in dr_r_cf_ensemble_var_weighted.
+
 Public API
 ----------
-get_icates(est_drl, est_lin, forests, X_feat, n)  -> (icates, lowers, uppers)
+get_icates(est_drl, drl_has_ci, est_lin, forests, X_feat, n)
 compute_scate(icates, lowers, uppers, n)            -> pd.DataFrame
 compute_subcate(icates, lowers, uppers, x12, n)     -> pd.DataFrame
 compute_pate(est_drl, drl_has_ci, est_lin, X_feat)  -> pd.DataFrame
 """
+
 import numpy as np
 import pandas as pd
 
 from config import (
-    CONTROL, TREATMENTS, ALPHA, USE_IF_CI,
+    CONTROL,
+    TREATMENTS,
+    ALPHA,
+    USE_IF_CI,
     ENSEMBLE_W_AUTOML_NOBOOT,
+    SE_FLOOR_FACTOR,
+    USE_FOREST_DRL,
 )
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Internal helpers
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _se_from_ci(lower: np.ndarray, upper: np.ndarray) -> np.ndarray:
     """Recover standard error from symmetric 95% CI half-width."""
@@ -49,6 +66,22 @@ def _variance_weighted_combine(
     """
     Optimal (minimum-variance) linear combination of K estimators.
 
+    SE floor  (v5)
+    --------------
+    For each estimator k, the per-observation SE is floored at:
+        SE_floor_k = SE_FLOOR_FACTOR * std(tau_k)
+
+    Motivation: with only N_BOOT=50 bootstrap replicates, individual CI
+    widths are noisy.  An observation that happens to get a very tight
+    bootstrap interval would receive near-infinite precision weight,
+    effectively ignoring all other estimators at that point.
+
+    The floor caps the maximum precision ratio across observations at
+    (1 / SE_FLOOR_FACTOR)^2 — with the default 0.1 this is 100:1.
+    This is far less extreme than the prior 1e-6 floor (ratio of ~10^12),
+    while still allowing the ensemble to upweight locally confident
+    estimators by up to 100× relative to locally uncertain ones.
+
     Parameters
     ----------
     estimates : list of K arrays, each shape (n,) — point estimates
@@ -60,13 +93,18 @@ def _variance_weighted_combine(
     lb_ens   : (n,) lower 95% CI bound
     ub_ens   : (n,) upper 95% CI bound
     """
-    # Clip SEs away from zero to avoid division blow-up in low-variance folds
-    MIN_SE = 1e-6
-    precisions = [1.0 / np.maximum(se, MIN_SE) ** 2 for se in ses]
+    floored_ses = []
+    for tau_k, se_k in zip(estimates, ses):
+        # Global std of this estimator's point predictions across all obs
+        global_se_k = float(np.std(tau_k)) * SE_FLOOR_FACTOR
+        # Floor must also be strictly positive even when std(tau_k) ~ 0
+        floor = max(global_se_k, 1e-8)
+        floored_ses.append(np.maximum(se_k, floor))
 
+    precisions = [1.0 / se**2 for se in floored_ses]
     total_precision = sum(precisions)
     tau_ens = sum(p * est for p, est in zip(precisions, estimates)) / total_precision
-    se_ens  = np.sqrt(1.0 / total_precision)
+    se_ens = np.sqrt(1.0 / total_precision)
 
     lb_ens = tau_ens - 1.96 * se_ens
     ub_ens = tau_ens + 1.96 * se_ens
@@ -77,13 +115,15 @@ def _variance_weighted_combine(
 # iCATE  (variance-weighted ensemble of 2 or 3 estimators)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def get_icates(
     est_drl,
-    drl_has_ci: bool,     # False when FLAML was used (no BootstrapInference)
-    est_lin,              # LinearDRLearner or None when USE_IF_CI = False
+    drl_has_ci: bool,  # False when FLAML was used (no BootstrapInference)
+    est_lin,  # LinearDRLearner or None when USE_IF_CI = False
     forests: dict,
     X_feat: np.ndarray,
     n: int,
+    forest_drl=None,  # ForestDRLearner or None when USE_FOREST_DRL=False
 ) -> tuple[dict, dict, dict]:
     """
     Variance-weighted ensemble iCATE point estimates and 95% CIs.
@@ -134,50 +174,56 @@ def get_icates(
 
         # Lists fed into _variance_weighted_combine for CI computation only
         ci_est_list: list[np.ndarray] = []
-        ci_se_list:  list[np.ndarray] = []
+        ci_se_list: list[np.ndarray] = []
 
         # — estimator 1 CIs: bootstrap (only when thread-safe nuisance) ──────
         if drl_has_ci:
-            lb_drl, ub_drl = est_drl.effect_interval(
-                                 X_feat, T0=CONTROL, T1=z, alpha=ALPHA)
+            lb_drl, ub_drl = est_drl.effect_interval(X_feat, T0=CONTROL, T1=z, alpha=ALPHA)
             ci_est_list.append(tau_drl)
             ci_se_list.append(_se_from_ci(lb_drl, ub_drl))
-            if z == TREATMENTS[0]:   # log once per arm set
+            if z == TREATMENTS[0]:  # log once per arm set
                 ci_sources.append("DRL-bootstrap")
 
         # — estimator 2 CIs: LinearDRL influence function ─────────────────────
         if USE_IF_CI and est_lin is not None:
-            tau_lin        = est_lin.effect(X_feat, T0=CONTROL, T1=z)
-            lb_lin, ub_lin = est_lin.effect_interval(
-                                 X_feat, T0=CONTROL, T1=z, alpha=ALPHA)
+            tau_lin = est_lin.effect(X_feat, T0=CONTROL, T1=z)
+            lb_lin, ub_lin = est_lin.effect_interval(X_feat, T0=CONTROL, T1=z, alpha=ALPHA)
             ci_est_list.append(tau_lin)
             ci_se_list.append(_se_from_ci(lb_lin, ub_lin))
             if z == TREATMENTS[0]:
                 ci_sources.append("LinearDRL-IF")
 
         # — estimator 3 CIs: CausalForest GRF variance ───────────────────────
-        cf, _mask      = forests[z]
-        tau_cf         = cf.effect(X_feat)
-        lb_cf, ub_cf   = cf.effect_interval(X_feat, alpha=ALPHA)
+        cf, _mask = forests[z]
+        tau_cf = cf.effect(X_feat)
+        lb_cf, ub_cf = cf.effect_interval(X_feat, alpha=ALPHA)
         ci_est_list.append(tau_cf)
         ci_se_list.append(_se_from_ci(lb_cf, ub_cf))
         if z == TREATMENTS[0]:
             ci_sources.append("CausalForest-GRF")
 
+        # — estimator 4 CIs: ForestDRLearner (DR + honest forest) ────────────
+        if USE_FOREST_DRL and forest_drl is not None:
+            tau_fdrl = forest_drl.effect(X_feat, T0=CONTROL, T1=z)
+            lb_fdrl, ub_fdrl = forest_drl.effect_interval(X_feat, T0=CONTROL, T1=z, alpha=ALPHA)
+            ci_est_list.append(tau_fdrl)
+            ci_se_list.append(_se_from_ci(lb_fdrl, ub_fdrl))
+            if z == TREATMENTS[0]:
+                ci_sources.append("ForestDRL-GRF")
+
         # — variance-weighted CI ───────────────────────────────────────────────
         # CIs are derived entirely from the analytic estimators above.
         # The nonlinear DRL point estimate is blended into the final mean
         # via a fixed weight when it has no bootstrap CI.
-        tau_ci_ens, lb_ens, ub_ens = _variance_weighted_combine(
-            ci_est_list, ci_se_list)
+        tau_ci_ens, lb_ens, ub_ens = _variance_weighted_combine(ci_est_list, ci_se_list)
 
         if drl_has_ci:
             # DRL already included in ci_est_list → tau_ci_ens is the full mean
             tau_ens = tau_ci_ens
         else:
             # Blend nonlinear DRL point estimate with conservative fixed weight
-            w_drl   = ENSEMBLE_W_AUTOML_NOBOOT          # e.g. 0.25
-            w_rest  = 1.0 - w_drl
+            w_drl = ENSEMBLE_W_AUTOML_NOBOOT  # e.g. 0.25
+            w_rest = 1.0 - w_drl
             tau_ens = w_drl * tau_drl + w_rest * tau_ci_ens
 
         icates[z] = tau_ens
@@ -192,6 +238,7 @@ def get_icates(
 # sCATE  (unchanged from v1)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def compute_scate(
     icates: dict,
     lowers: dict,
@@ -205,22 +252,25 @@ def compute_scate(
     """
     rows = []
     for z in TREATMENTS:
-        tau    = icates[z]
-        se_i   = _se_from_ci(lowers[z], uppers[z])
-        est    = float(tau.mean())
-        se_avg = float(np.sqrt((se_i ** 2).sum()) / n)
-        rows.append({
-            "z":        z,
-            "Estimate": est,
-            "L95":      est - 1.96 * se_avg,
-            "U95":      est + 1.96 * se_avg,
-        })
+        tau = icates[z]
+        se_i = _se_from_ci(lowers[z], uppers[z])
+        est = float(tau.mean())
+        se_avg = float(np.sqrt((se_i**2).sum()) / n)
+        rows.append(
+            {
+                "z": z,
+                "Estimate": est,
+                "L95": est - 1.96 * se_avg,
+                "U95": est + 1.96 * se_avg,
+            }
+        )
     return pd.DataFrame(rows)[["z", "Estimate", "L95", "U95"]]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # subCATE  (unchanged from v1)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def compute_subcate(
     icates: dict,
@@ -237,23 +287,26 @@ def compute_subcate(
     for x_val in [0, 1]:
         mask = (x12 == x_val).astype(float)
         for z in TREATMENTS:
-            tau    = icates[z]
-            se_i   = _se_from_ci(lowers[z], uppers[z])
-            est    = float((tau * mask).mean())
+            tau = icates[z]
+            se_i = _se_from_ci(lowers[z], uppers[z])
+            est = float((tau * mask).mean())
             se_sub = float(np.sqrt(((se_i * mask) ** 2).sum()) / n)
-            rows.append({
-                "z":        z,
-                "x":        int(x_val),
-                "Estimate": est,
-                "L95":      est - 1.96 * se_sub,
-                "U95":      est + 1.96 * se_sub,
-            })
+            rows.append(
+                {
+                    "z": z,
+                    "x": int(x_val),
+                    "Estimate": est,
+                    "L95": est - 1.96 * se_sub,
+                    "U95": est + 1.96 * se_sub,
+                }
+            )
     return pd.DataFrame(rows)[["z", "x", "Estimate", "L95", "U95"]]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PATE  (unchanged from v1 — uses DRL influence function)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def compute_pate(
     est_drl,
@@ -288,20 +341,20 @@ def compute_pate(
         ate_val = float(est_drl.ate(X_feat, T0=CONTROL, T1=z))
 
         if drl_has_ci:
-            ate_lb, ate_ub = est_drl.ate_interval(
-                                 X_feat, T0=CONTROL, T1=z, alpha=ALPHA)
+            ate_lb, ate_ub = est_drl.ate_interval(X_feat, T0=CONTROL, T1=z, alpha=ALPHA)
             ate_lb, ate_ub = float(ate_lb), float(ate_ub)
         elif est_lin is not None:
-            ate_lb, ate_ub = est_lin.ate_interval(
-                                 X_feat, T0=CONTROL, T1=z, alpha=ALPHA)
+            ate_lb, ate_ub = est_lin.ate_interval(X_feat, T0=CONTROL, T1=z, alpha=ALPHA)
             ate_lb, ate_ub = float(ate_lb), float(ate_ub)
         else:
             ate_lb, ate_ub = float("nan"), float("nan")
 
-        rows.append({
-            "z":        z,
-            "Estimate": ate_val,
-            "L95":      ate_lb,
-            "U95":      ate_ub,
-        })
+        rows.append(
+            {
+                "z": z,
+                "Estimate": ate_val,
+                "L95": ate_lb,
+                "U95": ate_ub,
+            }
+        )
     return pd.DataFrame(rows)[["z", "Estimate", "L95", "U95"]]

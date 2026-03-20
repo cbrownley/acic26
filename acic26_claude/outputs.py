@@ -10,6 +10,7 @@ best_scalar(df, z_col, est_col)            -> pd.DataFrame
 best_subcate(subcate_df)                   -> pd.DataFrame
 save(df, filename, out_dir)                -> None
 """
+
 import os
 import numpy as np
 import pandas as pd
@@ -17,10 +18,10 @@ from pathlib import Path
 
 from config import TREATMENTS
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # iCATE long-format assembly
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def build_icate_df(
     icates: dict,
@@ -37,19 +38,22 @@ def build_icate_df(
     n = len(ID)
     for z in TREATMENTS:
         for i in range(n):
-            rows.append({
-                "ID":       int(ID[i]),
-                "z":        z,
-                "Estimate": float(icates[z][i]),
-                "L95":      float(lowers[z][i]),
-                "U95":      float(uppers[z][i]),
-            })
+            rows.append(
+                {
+                    "ID": int(ID[i]),
+                    "z": z,
+                    "Estimate": float(icates[z][i]),
+                    "L95": float(lowers[z][i]),
+                    "U95": float(uppers[z][i]),
+                }
+            )
     return pd.DataFrame(rows)[["ID", "z", "Estimate", "L95", "U95"]]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Best-treatment derivations
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def best_icate(icates: dict, ID: np.ndarray) -> pd.DataFrame:
     """
@@ -86,7 +90,7 @@ def best_subcate(subcate_df: pd.DataFrame) -> pd.DataFrame:
     """
     rows = []
     for x_val in [0, 1]:
-        sub    = subcate_df[subcate_df["x"] == x_val]
+        sub = subcate_df[subcate_df["x"] == x_val]
         best_z = sub.loc[sub["Estimate"].idxmax(), "z"]
         rows.append({"x": int(x_val), "best_z": best_z})
     return pd.DataFrame(rows)[["x", "best_z"]]
@@ -95,6 +99,7 @@ def best_subcate(subcate_df: pd.DataFrame) -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────────────────────
 # CSV writer
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def save(df: pd.DataFrame, filename: str, out_dir) -> None:
     """

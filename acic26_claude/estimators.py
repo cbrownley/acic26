@@ -1,53 +1,72 @@
 """
 estimators.py
-Fitting the three CATE estimators used in the variance-weighted ensemble.
+Fitting the four CATE estimators used in the variance-weighted ensemble.
 
-v2 additions
+v6 additions
 ------------
-fit_linear_drlearner(X_feat, Y, T)
-    A LinearDRLearner with a polynomial featurizer and StatsModels sandwich
-    inference — gives influence-function CIs in seconds instead of minutes,
-    at the cost of assuming τ(x) is linear in the (expanded) feature space.
-    Used as the third member of the variance-weighted ensemble.
+fit_forest_drlearner(X_feat, Y, T)
+    ForestDRLearner: DR pseudo-outcomes fed into an honest causal forest.
+    This is the natural 4th estimator — it combines:
+      - Double robustness from the DR orthogonalization stage
+      - Non-parametric CATE flexibility from an honest causal forest
+      - GRF-style CIs without bootstrap
+    It is a single, tightly integrated pipeline, unlike our current approach
+    of running DRLearner and CausalForestDML separately and averaging.
 
-fit_drlearner  and  fit_causal_forest  now use AutoML nuisance models
-(when config.USE_AUTOML = True) and respect config.INNER_N_JOBS.
+    Why it adds genuine diversity to the ensemble
+    ----------------------------------------------
+    DRLearner (estimator 1): DR pseudo-outcomes → LightGBM stack final stage
+    LinearDRLearner (est. 2): DR pseudo-outcomes → polynomial linear final stage
+    CausalForestDML (est. 3): DML residuals → honest causal forest
+    ForestDRLearner (est. 4): DR pseudo-outcomes → honest causal forest
+
+    Estimators 3 and 4 both use honest forests but arrive via different
+    orthogonalization paths (DML vs. DR), so their errors are not perfectly
+    correlated — the ensemble benefits from both.
+
+v5 fixes retained
+-----------------
+- discrete_treatment=True on CausalForestDML
+- LGBMClassifier as model_t
+- ClippedClassifier on all propensity models (via make_propensity_model())
+- AUTOML_BOOTSTRAP guard
 
 Public API
 ----------
-fit_drlearner(X_feat, Y, T)           -> fitted DRLearner
-fit_linear_drlearner(X_feat, Y, T)    -> fitted LinearDRLearner  [new]
-fit_causal_forest(X_feat, Y, T)       -> dict {z: (fitted_CF, mask)}
+fit_drlearner(X_feat, Y, T)           -> (DRLearner, has_ci: bool)
+fit_linear_drlearner(X_feat, Y, T)    -> LinearDRLearner
+fit_causal_forest(X_feat, Y, T)       -> dict {z: (CausalForestDML, mask)}
+fit_forest_drlearner(X_feat, Y, T)    -> ForestDRLearner  [new]
 """
-import numpy as np
-from sklearn.ensemble import (
-    GradientBoostingRegressor, GradientBoostingClassifier,
-)
 
-from econml.dr  import DRLearner, LinearDRLearner
+import numpy as np
+from lightgbm import LGBMClassifier
+
+from econml.dr import DRLearner, LinearDRLearner, ForestDRLearner
 from econml.dml import CausalForestDML
 from econml.inference import BootstrapInference, StatsModelsInferenceDiscrete
 
-from config import (
-    ALL_ARMS, CONTROL, TREATMENTS,
-    N_CV_FOLDS, N_BOOT, CF_N_TREES,
-    USE_AUTOML, AUTOML_BOOTSTRAP,
-    RANDOM_STATE, INNER_N_JOBS, USE_IF_CI,
-)
+import config as _config
 from models import (
-    make_outcome_model, make_propensity_model, make_cate_model,
+    make_outcome_model,
+    make_propensity_model,
+    make_cate_model,
 )
 
+# Convenience aliases for values that never change at runtime
+# (structural constants, not CLI-overridable flags)
+ALL_ARMS = _config.ALL_ARMS
+CONTROL = _config.CONTROL
+TREATMENTS = _config.TREATMENTS
+LGBM_CLS = _config.LGBM_CLS
+
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 1. Nonlinear DR-Learner  (bootstrap CIs, AutoML nuisance)
+# 1. Nonlinear DR-Learner  (LightGBM stack, bootstrap CIs)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def fit_drlearner(
-    X_feat: np.ndarray,
-    Y: np.ndarray,
-    T: np.ndarray,
-) -> tuple:
+
+def fit_drlearner(X_feat, Y, T):
     """
     Fit a nonlinear doubly-robust learner with cross-fitting.
 
@@ -55,171 +74,137 @@ def fit_drlearner(
     -------
     (fitted_DRLearner, has_bootstrap_ci: bool)
 
-    has_bootstrap_ci = True   when USE_AUTOML=False (sklearn models, thread-safe)
-    has_bootstrap_ci = False  when USE_AUTOML=True  (FLAML, not thread-safe)
-
-    Bootstrap / FLAML incompatibility
-    ----------------------------------
-    BootstrapInference runs N_BOOT DRLearner fits inside joblib threads.
-    Each thread calls FLAML.fit(), which internally calls flaml.tune.run()
-    and creates a trial runner.  Inside a joblib thread the runner is None,
-    causing:
-        AttributeError: 'NoneType' object has no attribute 'stop_trial'
-
-    Fix: when USE_AUTOML=True, attach inference=None.  The point estimate
-    is still correct and still used in the ensemble.  CIs come from the
-    LinearDRLearner (IF/sandwich) and CausalForest (GRF), which have their
-    own analytic CI paths that are completely unaffected by this issue.
-
-    When USE_AUTOML=False, sklearn estimators are thread-safe so
-    BootstrapInference(n_jobs=-1) works normally.
+    has_bootstrap_ci=True  when _config.USE_BOOTSTRAP=True and USE_AUTOML=False.
+    has_bootstrap_ci=False when _config.USE_BOOTSTRAP=False (fast mode — CIs come
+                           from LinearDRLearner / CausalForest / ForestDRLearner)
+                           or when USE_AUTOML=True (FLAML breaks in threads).
     """
-    use_bootstrap = (not USE_AUTOML) or AUTOML_BOOTSTRAP
+    use_bootstrap = _config.USE_BOOTSTRAP and ((not _config.USE_AUTOML) or _config.AUTOML_BOOTSTRAP)
 
     est = DRLearner(
-        model_regression      = make_outcome_model(),
-        model_propensity      = make_propensity_model(),
-        model_final           = make_cate_model(),
-        cv                    = N_CV_FOLDS,
-        mc_iters              = 1,
-        random_state          = RANDOM_STATE,
-        categories            = ALL_ARMS,
-        multitask_model_final = False,
+        model_regression=make_outcome_model(),
+        model_propensity=make_propensity_model(),
+        model_final=make_cate_model(),
+        cv=_config.N_CV_FOLDS,
+        mc_iters=1,
+        random_state=_config.RANDOM_STATE,
+        categories=ALL_ARMS,
+        multitask_model_final=False,
     )
-
-    if use_bootstrap:
-        inference_obj = BootstrapInference(
-            n_bootstrap_samples=N_BOOT,
-            n_jobs=INNER_N_JOBS,
-            random_state=RANDOM_STATE,
-        )
-        print("  [DRL] Fitting nonlinear DR-Learner "
-              f"(AutoML nuisance, bootstrap CIs n={N_BOOT}) …")
-    else:
-        inference_obj = None
-        print("  [DRL] Fitting nonlinear DR-Learner "
-              "(AutoML nuisance, no bootstrap — FLAML/thread incompatibility) …")
-        print("        CIs will come from LinearDRLearner + CausalForest.")
-
-    est.fit(Y, T, X=X_feat, inference=inference_obj)
+    inference = (
+        BootstrapInference(n_bootstrap_samples=_config.N_BOOT, n_jobs=_config.INNER_N_JOBS) if use_bootstrap else None
+    )
+    tag = "bootstrap" if use_bootstrap else "point-only"
+    print(f"  [DRL] Fitting nonlinear DR-Learner ({tag}) …")
+    est.fit(Y, T, X=X_feat, inference=inference)
     print("  [DRL] Done.")
     return est, use_bootstrap
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2. Linear DR-Learner  (StatsModelsInferenceDiscrete HC1 CIs)
-#
-# Previous attempts used:
-#   (a) StatsModelsInference       → AssertionError: fit_intercept is True
-#       Wrong class: StatsModelsInference is for continuous-treatment DML.
-#       LinearDRLearner is a discrete-treatment DR estimator and requires
-#       StatsModelsInferenceDiscrete.
-#
-#   (b) _RecordingRidgeCV + model_final + _HC1SandwichEstimator
-#       → TypeError: unexpected keyword argument 'model_final'
-#       LinearDRLearner has no model_final param (that's only DRLearner).
-#       LinearDRLearner's final stage is always an internal linear model.
-#
-# Correct approach: use StatsModelsInferenceDiscrete(cov_type='HC1').
-# This is the inference class EconML designed for LinearDRLearner and
-# produces fast O(n) analytic HC1 CIs — no bootstrap, no custom classes.
+# 2. Linear DR-Learner  (influence-function / sandwich CIs)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def fit_linear_drlearner(
-    X_feat: np.ndarray,
-    Y: np.ndarray,
-    T: np.ndarray,
-) -> LinearDRLearner:
+
+def fit_linear_drlearner(X_feat, Y, T):
     """
-    Fit a LinearDRLearner with StatsModelsInferenceDiscrete HC1 CIs.
+    Fit a LinearDRLearner with HC1 sandwich (influence-function) CIs.
 
-    LinearDRLearner is the discrete-treatment variant of the DR estimator
-    whose final stage is an internal OLS/WLS linear model.  EconML provides
-    StatsModelsInferenceDiscrete specifically for this class: it computes
-    the asymptotic normal variance of the linear CATE coefficients using
-    heteroskedasticity-consistent (HC1) sandwich standard errors — the same
-    estimator as the semiparametric efficiency bound for the DR estimator.
-
-    This gives valid pointwise CIs in O(n) time after fitting, with no
-    bootstrap required.
-
-    Parameters
-    ----------
-    X_feat : preprocessed feature matrix (n x p)
-    Y      : outcome vector (n,)
-    T      : treatment arm strings (n,)
-
-    Returns
-    -------
-    Fitted LinearDRLearner with StatsModelsInferenceDiscrete attached.
-    Supports .effect(X, T0, T1) and .effect_interval(X, T0, T1, alpha).
+    Linear in X (no polynomial featurizer) to avoid rank deficiency when
+    ordinal-encoded + OHE features push the column count above n/5.
+    StatsModelsInferenceDiscrete provides HC1 heteroskedasticity-robust SEs.
     """
     est = LinearDRLearner(
-        model_regression  = make_outcome_model(),
-        model_propensity  = make_propensity_model(),
-        featurizer        = None,        # linear in X; avoids rank deficiency
-                                         # when preprocessed p > n
-        fit_cate_intercept= True,        # include intercept in linear CATE
-        cv                = N_CV_FOLDS,
-        random_state      = RANDOM_STATE,
-        categories        = ALL_ARMS,
+        model_regression=make_outcome_model(),
+        model_propensity=make_propensity_model(),
+        featurizer=None,
+        fit_cate_intercept=True,
+        cv=_config.N_CV_FOLDS,
+        random_state=_config.RANDOM_STATE,
+        categories=ALL_ARMS,
     )
-    print("  [IF]  Fitting linear DR-Learner (StatsModelsInferenceDiscrete HC1) …")
-    est.fit(Y, T, X=X_feat,
-            inference=StatsModelsInferenceDiscrete(cov_type='HC1'))
+    print("  [IF]  Fitting linear DR-Learner (HC1 sandwich CIs) …")
+    est.fit(Y, T, X=X_feat, inference=StatsModelsInferenceDiscrete(cov_type="HC1"))
     print("  [IF]  Done.")
     return est
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. CausalForest  (honesty-based GRF CIs, AutoML nuisance)
+# 3. CausalForest  (DML path, GRF honest CIs)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def fit_causal_forest(
-    X_feat: np.ndarray,
-    Y: np.ndarray,
-    T: np.ndarray,
-) -> dict:
+
+def fit_causal_forest(X_feat, Y, T):
     """
     Fit one CausalForestDML per treatment arm vs. control.
 
-    v2 change: nuisance models are now AutoML (FLAML) when USE_AUTOML=True.
-    The forest itself is unchanged — CF_N_TREES honest trees, GRF variance.
-
-    Parameters
-    ----------
-    X_feat : preprocessed feature matrix (n x p) — full sample
-    Y      : outcome vector (n,)
-    T      : treatment arm strings (n,)
-
-    Returns
-    -------
-    dict {z: (fitted_CausalForestDML, mask_bool)}
+    discrete_treatment=True: uses LGBMClassifier internally (correct for
+    binary arm-vs-control contrasts, not a continuous regressor).
     """
-    forests   = {}
-    mask_ctrl = (T == CONTROL)
+    forests = {}
+    mask_ctrl = T == CONTROL
+    lgbm_cls_params = {**LGBM_CLS, "n_jobs": _config.INNER_N_JOBS, "random_state": _config.RANDOM_STATE}
 
     for z in TREATMENTS:
-        mask_trt = (T == z)
-        mask     = mask_ctrl | mask_trt
+        mask_trt = T == z
+        mask = mask_ctrl | mask_trt
         Ys = Y[mask]
-        Ts = (T[mask] == z).astype(float)
+        Ts = (T[mask] == z).astype(int)
         Xs = X_feat[mask]
 
         cf = CausalForestDML(
-            model_y          = make_outcome_model(),
-            model_t          = GradientBoostingRegressor(
-                                   n_estimators=200, max_depth=3,
-                                   random_state=RANDOM_STATE),
-            n_estimators     = CF_N_TREES,
-            min_samples_leaf = 5,
-            max_depth        = None,
-            cv               = N_CV_FOLDS,
-            random_state     = RANDOM_STATE,
+            model_y=make_outcome_model(),
+            model_t=LGBMClassifier(**lgbm_cls_params),
+            discrete_treatment=_config.CF_DISCRETE_TREATMENT,
+            n_estimators=_config.CF_N_TREES,
+            min_samples_leaf=5,
+            max_depth=None,
+            cv=_config.N_CV_FOLDS,
+            random_state=_config.RANDOM_STATE,
         )
-        print(f"  [CF]  Fitting CausalForest for '{z}' vs '{CONTROL}' …")
-        cf.fit(Ys, Ts, X=Xs, inference='auto')
+        print(f"  [CF]  Fitting CausalForest '{z}' vs '{CONTROL}' …")
+        cf.fit(Ys, Ts, X=Xs, inference="auto")
         forests[z] = (cf, mask)
         print(f"  [CF]  Done '{z}'.")
 
     return forests
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. ForestDRLearner  (DR path + honest forest, GRF CIs)  [v6]
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def fit_forest_drlearner(X_feat, Y, T):
+    """
+    Fit a ForestDRLearner: DR pseudo-outcomes into an honest causal forest.
+
+    Ensemble role
+    -------------
+    This is the 4th ensemble member.  It shares the DR orthogonalization path
+    with DRLearner (est. 1) and LinearDRLearner (est. 2), but uses an honest
+    causal forest as the final stage instead of LightGBM or ridge regression.
+    CausalForestDML (est. 3) also uses an honest forest but via DML
+    residuals.  The two forest estimators arrive at the same covariate point
+    via different pseudo-outcome constructions, so their errors are partially
+    independent — the ensemble gains from both.
+
+    CI method
+    ---------
+    GRF-style honest variance (same as CausalForestDML).  No bootstrap needed.
+    effect_interval() is callable immediately after fit().
+    """
+    est = ForestDRLearner(
+        model_regression=make_outcome_model(),
+        model_propensity=make_propensity_model(),
+        n_estimators=_config.FDRL_N_TREES,
+        min_samples_leaf=_config.FDRL_MIN_LEAF,
+        max_depth=None,
+        cv=_config.N_CV_FOLDS,
+        random_state=_config.RANDOM_STATE,
+        categories=ALL_ARMS,
+    )
+    print("  [FDR] Fitting ForestDRLearner (DR + honest forest, GRF CIs) …")
+    est.fit(Y, T, X=X_feat, inference="auto")
+    print("  [FDR] Done.")
+    return est

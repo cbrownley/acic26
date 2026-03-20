@@ -60,31 +60,32 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 # One distinct color per treatment arm — order matches TREATMENTS = [b,c,d,e]
 ARM_COLORS = {
-    "b": "#4C8EDA",   # blue
-    "c": "#E07B39",   # orange
-    "d": "#3DB87A",   # green
-    "e": "#C855A0",   # magenta
+    "b": "#4C8EDA",  # blue
+    "c": "#E07B39",  # orange
+    "d": "#3DB87A",  # green
+    "e": "#C855A0",  # magenta
 }
-SUBGROUP_COLORS = {0: "#7FA7D4", 1: "#D47F7F"}   # x12=0 light blue, =1 rose
-RANDOM_COLOR    = "#AAAAAA"
+SUBGROUP_COLORS = {0: "#7FA7D4", 1: "#D47F7F"}  # x12=0 light blue, =1 rose
+RANDOM_COLOR = "#AAAAAA"
 
 STYLE = {
-    "figure.facecolor":   "white",
-    "axes.facecolor":     "white",
-    "axes.spines.top":    False,
-    "axes.spines.right":  False,
-    "axes.grid":          True,
-    "axes.grid.axis":     "y",
-    "grid.color":         "#E5E5E5",
-    "grid.linewidth":     0.6,
-    "font.size":          11,
-    "axes.titlesize":     12,
-    "axes.labelsize":     11,
-    "xtick.labelsize":    10,
-    "ytick.labelsize":    10,
-    "legend.frameon":     False,
-    "legend.fontsize":    10,
+    "figure.facecolor": "white",
+    "axes.facecolor": "white",
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    "axes.grid": True,
+    "axes.grid.axis": "y",
+    "grid.color": "#E5E5E5",
+    "grid.linewidth": 0.6,
+    "font.size": 11,
+    "axes.titlesize": 12,
+    "axes.labelsize": 11,
+    "xtick.labelsize": 10,
+    "ytick.labelsize": 10,
+    "legend.frameon": False,
+    "legend.fontsize": 10,
 }
+
 
 def _apply_style():
     plt.rcParams.update(STYLE)
@@ -103,10 +104,11 @@ def _save_or_return(fig: plt.Figure, filename: str, save_dir) -> plt.Figure:
 # 1. iCATE distributions  (per dataset)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def plot_icate_distributions(
     icate_df: pd.DataFrame,
-    data_id:  str,
-    save_dir  = None,
+    data_id: str,
+    save_dir=None,
 ) -> plt.Figure:
     """
     Violin plots of iCATE distributions by treatment arm.
@@ -126,7 +128,7 @@ def plot_icate_distributions(
     fig, ax = plt.subplots(figsize=(9, 5))
 
     positions = []
-    all_vals  = []
+    all_vals = []
     for i, z in enumerate(TREATMENTS):
         vals = icate_df.loc[icate_df["z"] == z, "Estimate"].values
         parts = ax.violinplot(
@@ -155,8 +157,7 @@ def plot_icate_distributions(
     ax.set_axisbelow(True)
 
     legend_patches = [
-        matplotlib.patches.Patch(facecolor=ARM_COLORS[z], label=f"arm {z}", alpha=0.75)
-        for z in TREATMENTS
+        matplotlib.patches.Patch(facecolor=ARM_COLORS[z], label=f"arm {z}", alpha=0.75) for z in TREATMENTS
     ]
     ax.legend(handles=legend_patches, loc="best")
 
@@ -168,11 +169,12 @@ def plot_icate_distributions(
 # 2. sCATE and PATE side-by-side  (per dataset)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def plot_estimates_with_ci(
     scate_df: pd.DataFrame,
-    pate_df:  pd.DataFrame,
-    data_id:  str,
-    save_dir  = None,
+    pate_df: pd.DataFrame,
+    data_id: str,
+    save_dir=None,
 ) -> plt.Figure:
     """
     Dot-and-whisker chart comparing sCATE and PATE per arm.
@@ -194,11 +196,12 @@ def plot_estimates_with_ci(
 
     for ax, (title, df) in zip(axes, datasets.items()):
         for i, z in enumerate(TREATMENTS):
-            row  = df.loc[df["z"] == z].iloc[0]
-            est  = row["Estimate"]
+            row = df.loc[df["z"] == z].iloc[0]
+            est = row["Estimate"]
             xerr = np.array([[est - row["L95"]], [row["U95"] - est]])
             ax.errorbar(
-                est, i,
+                est,
+                i,
                 xerr=xerr,
                 fmt="o",
                 color=ARM_COLORS[z],
@@ -216,8 +219,7 @@ def plot_estimates_with_ci(
         ax.set_axisbelow(True)
 
     axes[0].set_ylabel("Treatment arm")
-    fig.suptitle(f"Dataset {data_id} — Average treatment effects with 95% CIs",
-                 fontsize=13, y=1.01)
+    fig.suptitle(f"Dataset {data_id} — Average treatment effects with 95% CIs", fontsize=13, y=1.01)
     fig.tight_layout()
     return _save_or_return(fig, f"ate_ci_{data_id}.png", save_dir)
 
@@ -226,10 +228,11 @@ def plot_estimates_with_ci(
 # 3. subCATE grouped bars  (per dataset)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def plot_subcate(
     subcate_df: pd.DataFrame,
-    data_id:    str,
-    save_dir    = None,
+    data_id: str,
+    save_dir=None,
 ) -> plt.Figure:
     """
     Grouped bar chart of subCATE by arm and X12 subgroup.
@@ -245,22 +248,22 @@ def plot_subcate(
     _apply_style()
     fig, ax = plt.subplots(figsize=(10, 5))
 
-    n_arms     = len(TREATMENTS)
-    bar_width  = 0.32
-    group_gap  = 0.85
-    x_centers  = np.arange(n_arms) * group_gap
+    n_arms = len(TREATMENTS)
+    bar_width = 0.32
+    group_gap = 0.85
+    x_centers = np.arange(n_arms) * group_gap
 
     for j, x_val in enumerate([0, 1]):
         offsets = x_centers + (j - 0.5) * bar_width
         for i, z in enumerate(TREATMENTS):
-            row   = subcate_df.loc[(subcate_df["z"] == z) &
-                                   (subcate_df["x"] == x_val)].iloc[0]
-            est   = row["Estimate"]
-            yerr  = np.array([[est - row["L95"]], [row["U95"] - est]])
+            row = subcate_df.loc[(subcate_df["z"] == z) & (subcate_df["x"] == x_val)].iloc[0]
+            est = row["Estimate"]
+            yerr = np.array([[est - row["L95"]], [row["U95"] - est]])
             color = SUBGROUP_COLORS[x_val]
             alpha = 0.85 if x_val == 1 else 0.60
             bar = ax.bar(
-                offsets[i], est,
+                offsets[i],
+                est,
                 width=bar_width - 0.04,
                 color=ARM_COLORS[z],
                 alpha=alpha,
@@ -268,7 +271,8 @@ def plot_subcate(
                 linewidth=0.5,
             )
             ax.errorbar(
-                offsets[i], est,
+                offsets[i],
+                est,
                 yerr=yerr,
                 fmt="none",
                 color="#333333",
@@ -283,18 +287,12 @@ def plot_subcate(
     ax.set_title(f"Dataset {data_id} — subCATE by arm and X₁₂ subgroup")
 
     legend_handles = [
-        matplotlib.patches.Patch(
-            facecolor="#888888", alpha=0.60, label="x₁₂ = 0"),
-        matplotlib.patches.Patch(
-            facecolor="#888888", alpha=0.85, label="x₁₂ = 1"),
+        matplotlib.patches.Patch(facecolor="#888888", alpha=0.60, label="x₁₂ = 0"),
+        matplotlib.patches.Patch(facecolor="#888888", alpha=0.85, label="x₁₂ = 1"),
     ]
     # Also add arm color swatches
-    arm_handles = [
-        matplotlib.patches.Patch(facecolor=ARM_COLORS[z], label=f"arm {z}")
-        for z in TREATMENTS
-    ]
-    ax.legend(handles=legend_handles + arm_handles,
-              ncol=3, loc="upper right", fontsize=9)
+    arm_handles = [matplotlib.patches.Patch(facecolor=ARM_COLORS[z], label=f"arm {z}") for z in TREATMENTS]
+    ax.legend(handles=legend_handles + arm_handles, ncol=3, loc="upper right", fontsize=9)
 
     fig.tight_layout()
     return _save_or_return(fig, f"subcate_{data_id}.png", save_dir)
@@ -304,11 +302,12 @@ def plot_subcate(
 # 4. Relative cumulative gain curves  (per dataset)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def plot_gain_curves(
     curves_dict: dict,
-    aucs_dict:   dict,
-    data_id:     str,
-    save_dir     = None,
+    aucs_dict: dict,
+    data_id: str,
+    save_dir=None,
 ) -> plt.Figure:
     """
     2×2 small-multiples of relative cumulative gain curves, one per arm.
@@ -331,16 +330,14 @@ def plot_gain_curves(
     """
     _apply_style()
     arms_present = [z for z in TREATMENTS if z in curves_dict]
-    n_panels     = len(arms_present)
+    n_panels = len(arms_present)
     if n_panels == 0:
         print("  [VIZ] No gain curves to plot.")
         return None
 
-    ncols  = 2
-    nrows  = int(np.ceil(n_panels / ncols))
-    fig, axes = plt.subplots(nrows, ncols,
-                             figsize=(11, 4.5 * nrows),
-                             sharex=True)
+    ncols = 2
+    nrows = int(np.ceil(n_panels / ncols))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(11, 4.5 * nrows), sharex=True)
     axes_flat = np.array(axes).flatten()
 
     # Detect column names from fklearn output
@@ -380,38 +377,38 @@ def plot_gain_curves(
             y = df["gain"].values
         else:
             skip = {"n_samples", "perc_size", "treatment", "outcome", "prediction"}
-            numeric_cols = [c for c in df.select_dtypes(include=float).columns
-                            if c not in skip]
+            numeric_cols = [c for c in df.select_dtypes(include=float).columns if c not in skip]
             y = df[numeric_cols[0]].values if numeric_cols else np.zeros(len(x))
         return x, y
 
     for idx, z in enumerate(arms_present):
-        ax    = axes_flat[idx]
+        ax = axes_flat[idx]
         color = ARM_COLORS[z]
         curve = curves_dict[z]
-        x, y  = _get_xy(curve)
+        x, y = _get_xy(curve)
 
         # Curve
         ax.plot(x, y, color=color, linewidth=2, label=f"arm {z}")
         # Shaded area between curve and baseline
-        ax.fill_between(x, y, 0,
-                         where=(y >= 0), color=color, alpha=0.15, interpolate=True)
-        ax.fill_between(x, y, 0,
-                         where=(y < 0),  color=color, alpha=0.10, interpolate=True)
+        ax.fill_between(x, y, 0, where=(y >= 0), color=color, alpha=0.15, interpolate=True)
+        ax.fill_between(x, y, 0, where=(y < 0), color=color, alpha=0.10, interpolate=True)
         # Random baseline
-        ax.axhline(0, color=RANDOM_COLOR, linewidth=1.2,
-                   linestyle="--", label="random")
+        ax.axhline(0, color=RANDOM_COLOR, linewidth=1.2, linestyle="--", label="random")
 
         # AURC annotation
         auc_val = aucs_dict.get(z, float("nan"))
         auc_txt = f"AURC = {auc_val:.4f}" if not np.isnan(auc_val) else "AURC = n/a"
-        ax.text(0.97, 0.95, auc_txt,
-                transform=ax.transAxes,
-                ha="right", va="top",
-                fontsize=9,
-                color=color,
-                bbox=dict(boxstyle="round,pad=0.2",
-                          facecolor="white", edgecolor=color, linewidth=0.8))
+        ax.text(
+            0.97,
+            0.95,
+            auc_txt,
+            transform=ax.transAxes,
+            ha="right",
+            va="top",
+            fontsize=9,
+            color=color,
+            bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor=color, linewidth=0.8),
+        )
 
         ax.set_title(f"Arm {z} vs {CONTROL}")
         ax.set_xlabel("Fraction of population targeted")
@@ -438,9 +435,10 @@ def plot_gain_curves(
 # 5. AUC heatmap across datasets  (multi-dataset)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def plot_auc_heatmap(
-    auc_records:  list[dict],
-    save_dir      = None,
+    auc_records: list[dict],
+    save_dir=None,
 ) -> plt.Figure:
     """
     Heatmap of AURC values across datasets (rows) and treatment arms (cols).
@@ -464,8 +462,7 @@ def plot_auc_heatmap(
     fig, ax = plt.subplots(figsize=(7, fig_h))
 
     vmax = df.abs().max().max()
-    im = ax.imshow(df.values, aspect="auto",
-                   cmap="RdYlGn", vmin=-vmax, vmax=vmax)
+    im = ax.imshow(df.values, aspect="auto", cmap="RdYlGn", vmin=-vmax, vmax=vmax)
 
     ax.set_xticks(range(n_arms))
     ax.set_xticklabels(df.columns, rotation=0)
@@ -477,16 +474,14 @@ def plot_auc_heatmap(
         for j in range(n_arms):
             val = df.values[i, j]
             txt = f"{val:.3f}" if not np.isnan(val) else "—"
-            ax.text(j, i, txt,
-                    ha="center", va="center",
-                    fontsize=8.5,
-                    color="white" if abs(val) > vmax * 0.6 else "#333333")
+            ax.text(
+                j, i, txt, ha="center", va="center", fontsize=8.5, color="white" if abs(val) > vmax * 0.6 else "#333333"
+            )
 
     cbar = fig.colorbar(im, ax=ax, fraction=0.03, pad=0.04)
     cbar.set_label("AURC", fontsize=10)
 
-    ax.set_title("AURC (area under relative cumulative gain curve)\n"
-                 "per dataset × treatment arm", fontsize=12)
+    ax.set_title("AURC (area under relative cumulative gain curve)\n" "per dataset × treatment arm", fontsize=12)
     ax.set_xlabel("Treatment arm")
     ax.set_ylabel("Dataset ID")
     fig.tight_layout()
@@ -497,9 +492,10 @@ def plot_auc_heatmap(
 # 6. sCATE estimates across datasets  (multi-dataset)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def plot_scate_across_datasets(
     scate_records: list[dict],
-    save_dir       = None,
+    save_dir=None,
 ) -> plt.Figure:
     """
     Small-multiples dot-and-whisker chart: sCATE per dataset, faceted by arm.
@@ -514,38 +510,28 @@ def plot_scate_across_datasets(
     _apply_style()
     df = pd.DataFrame(scate_records)
     dataset_ids = df["data_id"].unique()
-    n_datasets  = len(dataset_ids)
-    id_to_y     = {did: i for i, did in enumerate(dataset_ids)}
+    n_datasets = len(dataset_ids)
+    id_to_y = {did: i for i, did in enumerate(dataset_ids)}
 
     ncols = min(4, len(TREATMENTS))
     nrows = int(np.ceil(len(TREATMENTS) / ncols))
-    fig, axes = plt.subplots(nrows, ncols,
-                              figsize=(4.5 * ncols, 1.5 + 0.45 * n_datasets),
-                              sharey=True)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(4.5 * ncols, 1.5 + 0.45 * n_datasets), sharey=True)
     axes_flat = np.array(axes).flatten()
 
     y_ticks = list(range(n_datasets))
 
     for idx, z in enumerate(TREATMENTS):
-        ax      = axes_flat[idx]
-        sub     = df[df["z"] == z]
-        color   = ARM_COLORS[z]
+        ax = axes_flat[idx]
+        sub = df[df["z"] == z]
+        color = ARM_COLORS[z]
 
         for _, row in sub.iterrows():
             y_pos = id_to_y[row["data_id"]]
-            est   = row["Estimate"]
-            xerr  = np.array([[est - row["L95"]], [row["U95"] - est]])
-            ax.errorbar(est, y_pos,
-                        xerr=xerr,
-                        fmt="o",
-                        color=color,
-                        markersize=5,
-                        capsize=3,
-                        linewidth=1.2,
-                        alpha=0.85)
+            est = row["Estimate"]
+            xerr = np.array([[est - row["L95"]], [row["U95"] - est]])
+            ax.errorbar(est, y_pos, xerr=xerr, fmt="o", color=color, markersize=5, capsize=3, linewidth=1.2, alpha=0.85)
 
-        ax.axvline(0, color="#555555", linewidth=0.8,
-                   linestyle="--", alpha=0.7)
+        ax.axvline(0, color="#555555", linewidth=0.8, linestyle="--", alpha=0.7)
         ax.set_yticks(y_ticks)
         ax.set_yticklabels(list(dataset_ids), fontsize=8)
         ax.set_title(f"arm {z} vs {CONTROL}", color=color, fontweight="bold")
@@ -566,9 +552,10 @@ def plot_scate_across_datasets(
 # 7. iCATE violin grid across datasets  (multi-dataset, ≤ 9 datasets)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def plot_icate_violin_grid(
-    icate_dfs:   dict,
-    save_dir     = None,
+    icate_dfs: dict,
+    save_dir=None,
 ) -> plt.Figure:
     """
     Grid of violin plots: rows = datasets, columns = arms.
@@ -583,15 +570,16 @@ def plot_icate_violin_grid(
     """
     _apply_style()
     dataset_ids = list(icate_dfs.keys())
-    n_datasets  = len(dataset_ids)
+    n_datasets = len(dataset_ids)
     if n_datasets > 12:
         print("  [VIZ] iCATE violin grid: capping at 12 datasets for readability.")
         dataset_ids = dataset_ids[:12]
-        n_datasets  = 12
+        n_datasets = 12
 
     n_arms = len(TREATMENTS)
     fig, axes = plt.subplots(
-        n_datasets, n_arms,
+        n_datasets,
+        n_arms,
         figsize=(2.8 * n_arms, 2.2 * n_datasets),
         sharex="col",
     )
@@ -602,11 +590,14 @@ def plot_icate_violin_grid(
     for r, did in enumerate(dataset_ids):
         df = icate_dfs[did]
         for c, z in enumerate(TREATMENTS):
-            ax   = axes[r, c]
+            ax = axes[r, c]
             vals = df.loc[df["z"] == z, "Estimate"].values
             parts = ax.violinplot(
-                vals, positions=[0], widths=0.7,
-                showmedians=True, showextrema=False,
+                vals,
+                positions=[0],
+                widths=0.7,
+                showmedians=True,
+                showextrema=False,
             )
             color = ARM_COLORS[z]
             for pc in parts["bodies"]:
@@ -615,20 +606,17 @@ def plot_icate_violin_grid(
             parts["cmedians"].set_color("white")
             parts["cmedians"].set_linewidth(1.5)
 
-            ax.axhline(0, color="#888888", linewidth=0.6,
-                       linestyle="--", alpha=0.7)
+            ax.axhline(0, color="#888888", linewidth=0.6, linestyle="--", alpha=0.7)
             ax.set_xticks([])
             ax.yaxis.set_tick_params(labelsize=7)
             ax.spines["bottom"].set_visible(False)
 
             # Row label (dataset) on left edge
             if c == 0:
-                ax.set_ylabel(f"ds {did}", fontsize=8, rotation=0,
-                              labelpad=30, va="center")
+                ax.set_ylabel(f"ds {did}", fontsize=8, rotation=0, labelpad=30, va="center")
             # Column label (arm) on top edge
             if r == 0:
-                ax.set_title(f"{z} vs {CONTROL}", color=color,
-                             fontsize=10, fontweight="bold")
+                ax.set_title(f"{z} vs {CONTROL}", color=color, fontsize=10, fontweight="bold")
 
     fig.suptitle("iCATE distributions — datasets × arms", fontsize=13, y=1.01)
     fig.tight_layout()
@@ -639,9 +627,10 @@ def plot_icate_violin_grid(
 # 8. PATE vs sCATE scatter  (multi-dataset)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def plot_pate_vs_scate(
     combined_records: list[dict],
-    save_dir          = None,
+    save_dir=None,
 ) -> plt.Figure:
     """
     Scatter plot: sCATE (x) vs PATE (y) per arm, across datasets.
@@ -658,37 +647,33 @@ def plot_pate_vs_scate(
     _apply_style()
     df = pd.DataFrame(combined_records)
 
-    fig, axes = plt.subplots(1, len(TREATMENTS),
-                              figsize=(3.8 * len(TREATMENTS), 4),
-                              sharex=False, sharey=False)
+    fig, axes = plt.subplots(1, len(TREATMENTS), figsize=(3.8 * len(TREATMENTS), 4), sharex=False, sharey=False)
     if len(TREATMENTS) == 1:
         axes = [axes]
 
     for ax, z in zip(axes, TREATMENTS):
-        sub   = df[df["z"] == z]
+        sub = df[df["z"] == z]
         color = ARM_COLORS[z]
 
-        ax.scatter(sub["sCATE"], sub["PATE"],
-                   c=color, alpha=0.75, s=55, zorder=3)
+        ax.scatter(sub["sCATE"], sub["PATE"], c=color, alpha=0.75, s=55, zorder=3)
 
         # Diagonal reference line
         all_vals = pd.concat([sub["sCATE"], sub["PATE"]])
-        lo, hi   = all_vals.min(), all_vals.max()
-        margin   = (hi - lo) * 0.08
-        diag     = np.array([lo - margin, hi + margin])
-        ax.plot(diag, diag, color=RANDOM_COLOR,
-                linewidth=1, linestyle="--", label="y = x", zorder=2)
+        lo, hi = all_vals.min(), all_vals.max()
+        margin = (hi - lo) * 0.08
+        diag = np.array([lo - margin, hi + margin])
+        ax.plot(diag, diag, color=RANDOM_COLOR, linewidth=1, linestyle="--", label="y = x", zorder=2)
 
         ax.set_xlabel("sCATE")
         ax.set_ylabel("PATE")
         ax.set_title(f"arm {z} vs {CONTROL}", color=color, fontweight="bold")
         ax.legend(fontsize=8)
-        ax.set_xlim(diag); ax.set_ylim(diag)
+        ax.set_xlim(diag)
+        ax.set_ylim(diag)
         ax.grid(True, linewidth=0.4)
         ax.set_axisbelow(True)
 
-    fig.suptitle("sCATE vs PATE across datasets\n(points near diagonal = consistent estimation)",
-                 fontsize=12, y=1.02)
+    fig.suptitle("sCATE vs PATE across datasets\n(points near diagonal = consistent estimation)", fontsize=12, y=1.02)
     fig.tight_layout()
     return _save_or_return(fig, "pate_vs_scate.png", save_dir)
 
@@ -697,15 +682,16 @@ def plot_pate_vs_scate(
 # 9. Convenience: generate all single-dataset plots in one call
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def plot_all_single_dataset(
-    data_id:    str,
-    icate_df:   pd.DataFrame,
-    scate_df:   pd.DataFrame,
+    data_id: str,
+    icate_df: pd.DataFrame,
+    scate_df: pd.DataFrame,
     subcate_df: pd.DataFrame,
-    pate_df:    pd.DataFrame,
+    pate_df: pd.DataFrame,
     curves_dict: dict,
-    aucs_dict:   dict,
-    save_dir    = None,
+    aucs_dict: dict,
+    save_dir=None,
 ) -> dict:
     """
     Generate all four single-dataset plots and return them as a dict.
@@ -718,9 +704,9 @@ def plot_all_single_dataset(
     dict with keys: 'icate', 'estimates_ci', 'subcate', 'gain_curves'
     """
     figs = {}
-    figs["icate"]        = plot_icate_distributions(icate_df, data_id, save_dir)
+    figs["icate"] = plot_icate_distributions(icate_df, data_id, save_dir)
     figs["estimates_ci"] = plot_estimates_with_ci(scate_df, pate_df, data_id, save_dir)
-    figs["subcate"]      = plot_subcate(subcate_df, data_id, save_dir)
+    figs["subcate"] = plot_subcate(subcate_df, data_id, save_dir)
     if curves_dict:
         figs["gain_curves"] = plot_gain_curves(curves_dict, aucs_dict, data_id, save_dir)
     return figs
