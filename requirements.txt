@@ -1,0 +1,62 @@
+# requirements.txt — pip dependencies for acic26
+# Translated from environment.yml (conda-forge)
+# Python version is managed by pyenv (see scripts/bootstrap.sh)
+
+# Core stack
+numpy~=1.26.0
+pandas~=2.1.0
+scipy~=1.11.0
+scikit-learn~=1.3.0
+statsmodels~=0.14.0
+patsy
+tabulate
+
+# ML
+lightgbm~=4.0
+xgboost~=2.0
+catboost~=1.2.0
+flaml
+shap
+scikit-learn-intelex
+
+# Visualization
+matplotlib~=3.8.0
+seaborn
+plotly
+tqdm
+
+# Data
+pyarrow
+openpyxl
+xlrd
+
+# Graph / DAG tools
+# Note: system graphviz binary is installed via brew in bootstrap.sh
+graphviz
+pydot
+networkx
+
+# Performance
+numba~=0.58.0
+dask
+joblib
+
+# Notebooks
+jupyterlab
+notebook
+ipykernel
+
+# Dev tools
+black
+isort
+flake8
+pylint
+pre-commit
+
+# Misc utilities
+sympy
+
+# Causal inference
+econml
+doubleml
+fklearn
