@@ -95,10 +95,10 @@ if [[ ! -f "${REQUIREMENTS}" ]]; then
 fi
 
 info "Upgrading pip..."
-pyenv exec pip install --quiet --upgrade pip
+PYENV_VERSION="${VENV_NAME}" pyenv exec pip install --quiet --upgrade pip
 
 info "Installing dependencies from requirements.txt..."
-pyenv exec pip install --quiet -r "${REQUIREMENTS}"
+PYENV_VERSION="${VENV_NAME}" pyenv exec pip install --quiet -r "${REQUIREMENTS}"
 
 # ── 8. Write .python-version so pyenv auto-selects the venv in this repo ─────
 PYTHON_VERSION_FILE="${REPO_ROOT}/.python-version"
