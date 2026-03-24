@@ -72,7 +72,7 @@ if ! pyenv commands | grep -q "^virtualenv$"; then
 fi
 
 # ── 5. Create the virtualenv ──────────────────────────────────────────────────
-if pyenv virtualenvs --bare 2>/dev/null | grep -qxF "${VENV_NAME}"; then
+if pyenv virtualenvs --bare 2>/dev/null | tr -d ' *' | grep -qxF "${VENV_NAME}"; then
   info "pyenv virtualenv '${VENV_NAME}' already exists."
 else
   info "Creating pyenv virtualenv '${VENV_NAME}' (Python ${PYTHON_VERSION})..."
