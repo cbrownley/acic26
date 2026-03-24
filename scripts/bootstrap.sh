@@ -5,14 +5,14 @@
 #   ./scripts/bootstrap.sh [PYTHON_VERSION] [VENV_NAME]
 #
 # Defaults:
-#   PYTHON_VERSION = 3.14.3
+#   PYTHON_VERSION = 3.12.4
 #   VENV_NAME      = acic26
 #
 # Requires: macOS, Homebrew (to install pyenv if not present)
 
 set -euo pipefail
 
-PYTHON_VERSION="${1:-3.14.3}"
+PYTHON_VERSION="${1:-3.12.4}"
 VENV_NAME="${2:-acic26}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
