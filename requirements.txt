@@ -3,26 +3,26 @@
 # Python version is managed by pyenv (see scripts/bootstrap.sh)
 
 # Core stack
-numpy~=1.26.0
-pandas~=2.1.0
-scipy~=1.11.0
-scikit-learn~=1.3.0
-statsmodels~=0.14.0
+numpy>=2.4.3
+pandas==3.0.1
+scipy
+scikit-learn
+statsmodels
 patsy
 tabulate
 
 # ML
-lightgbm~=4.0
-xgboost~=2.0
-catboost~=1.2.0
+lightgbm
+xgboost
+catboost
 flaml
 shap
-scikit-learn-intelex
+# scikit-learn-intelex
 
 # Visualization
-matplotlib~=3.8.0
+matplotlib
 seaborn
-plotly
+plotly>=6.5.2
 tqdm
 
 # Data
@@ -37,7 +37,7 @@ pydot
 networkx
 
 # Performance
-numba~=0.58.0
+numba==0.64.0
 dask
 joblib
 
@@ -58,5 +58,5 @@ sympy
 
 # Causal inference
 econml
-doubleml
+doubleml==0.11.2
 fklearn
