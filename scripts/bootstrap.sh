@@ -58,7 +58,7 @@ if ! command -v pyenv &>/dev/null; then
 fi
 
 # ── 3. Install target Python version ─────────────────────────────────────────
-if pyenv versions --bare | grep -qxF "${PYTHON_VERSION}"; then
+if pyenv versions --bare | grep "${PYTHON_VERSION}"; then
   info "Python ${PYTHON_VERSION} already installed in pyenv."
 else
   info "Installing Python ${PYTHON_VERSION} via pyenv (this may take a few minutes)..."
@@ -72,7 +72,7 @@ if ! pyenv commands | grep -q "^virtualenv$"; then
 fi
 
 # ── 5. Create the virtualenv ──────────────────────────────────────────────────
-if pyenv virtualenvs --bare 2>/dev/null | tr -d ' *' | grep -qxF "${VENV_NAME}"; then
+if pyenv virtualenvs --bare 2>/dev/null | grep "${VENV_NAME}"; then
   info "pyenv virtualenv '${VENV_NAME}' already exists."
 else
   info "Creating pyenv virtualenv '${VENV_NAME}' (Python ${PYTHON_VERSION})..."
