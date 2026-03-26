@@ -1,4 +1,12 @@
-# requirements.txt — pip dependencies for acic26
+# core_requirements.txt — pip dependencies for acic26
+# When setting up the new repo, run scripts/bootstrap.sh, which
+# install from requirments.txt
+# 
+# This file specifies the core set of requirements we're interested
+# in for the project. The full set of dependencies is pinned in 
+# requirements.text (including down stream dependencies from the
+# packages pinned here). After installing all of these, we generated
+# the (more complete) requirements.txt with `pip freeze`.
 # Translated from environment.yml (conda-forge)
 # Python version is managed by pyenv (see scripts/bootstrap.sh)
 
