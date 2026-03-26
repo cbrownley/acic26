@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-PYTHON_VERSION="${1:-3.12.4}"
+PYTHON_VERSION="${1:-3.11.9}"
 VENV_NAME="${2:-acic26}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -98,7 +98,7 @@ info "Upgrading pip..."
 PYENV_VERSION="${VENV_NAME}" pyenv exec pip install --quiet --upgrade pip
 
 info "Installing dependencies from requirements.txt..."
-PYENV_VERSION="${VENV_NAME}" pyenv exec pip install --quiet -r "${REQUIREMENTS}"
+PYENV_VERSION="${VENV_NAME}" pyenv exec pip install -r "${REQUIREMENTS}"
 
 # ── 8. Write .python-version so pyenv auto-selects the venv in this repo ─────
 PYTHON_VERSION_FILE="${REPO_ROOT}/.python-version"

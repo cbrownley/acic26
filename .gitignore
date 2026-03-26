@@ -75,6 +75,7 @@ env.bak/
 venv.bak/
 conda-env/
 *.conda
+.python-version
 
 # -------------------------
 

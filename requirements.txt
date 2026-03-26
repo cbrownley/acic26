@@ -2,61 +2,62 @@
 # Translated from environment.yml (conda-forge)
 # Python version is managed by pyenv (see scripts/bootstrap.sh)
 
-# Core stack
-numpy>=2.4.3
-pandas==3.0.1
-scipy
-scikit-learn
-statsmodels
-patsy
-tabulate
+# # Core stack
+numpy==1.26.4
+pandas==2.3.3
+scipy==1.17.1
+scikit-learn==1.6.1
+statsmodels==0.14.6
+patsy==1.0.2
+tabulate==0.10.0
 
 # ML
-lightgbm
-xgboost
-catboost
-flaml
-shap
-# scikit-learn-intelex
+lightgbm==4.6.0
+xgboost==3.2.0
+catboost==1.2.10
+flaml==2.5.0
+shap==0.48.0
+# # Couldn't find this in pip
+# # scikit-learn-intelex
 
-# Visualization
-matplotlib
-seaborn
-plotly>=6.5.2
-tqdm
+# # Visualization
+matplotlib==3.10.8
+seaborn==0.13.2
+plotly==6.6.0
+tqdm==4.67.3
 
 # Data
-pyarrow
-openpyxl
-xlrd
+pyarrow==23.0.1
+openpyxl==3.1.5
+xlrd==2.0.2
 
 # Graph / DAG tools
 # Note: system graphviz binary is installed via brew in bootstrap.sh
-graphviz
-pydot
-networkx
+graphviz==0.21
+pydot==4.0.1
+networkx==3.6.1
 
 # Performance
 numba==0.64.0
-dask
-joblib
+dask==2026.3.0
+joblib==1.5.3
 
 # Notebooks
-jupyterlab
-notebook
-ipykernel
+jupyterlab==4.5.6
+notebook==7.5.5
+ipykernel==7.2.0
 
 # Dev tools
-black
-isort
-flake8
-pylint
-pre-commit
+black==26.3.1
+isort==8.0.1
+flake8==7.3.0
+pylint==4.0.5
+pre-commit==4.5.1
 
 # Misc utilities
-sympy
+sympy==1.14.0
 
 # Causal inference
-econml>=0.16.0
-doubleml>=0.12.0
-fklearn>=2.2.1
+econml==0.16.0
+doubleml==0.10.1
+fklearn==4.0.1
