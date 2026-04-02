@@ -44,6 +44,7 @@ import warnings
 from contextlib import contextmanager
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
+from datetime import datetime
 
 import pandas as pd
 from tqdm import tqdm
@@ -294,12 +295,16 @@ def process_dataset(
     save(best_subcate_df, f"BEST_subCATE_{d}_{t}_{s}.csv", out_dir)
     save(best_pate_df, f"BEST_PATE_{d}_{t}_{s}.csv", out_dir)
 
+    # Diagnostic files → sibling folders AUCs/ and RATEs/
+    auc_dir = out_dir.parent / "AUCs"
+    rate_dir = out_dir.parent / "RATEs"
+
     if aucs:
         aucs_df = pd.DataFrame([{"z": z, "AURC": v} for z, v in aucs.items()])
-        save(aucs_df, f"aucs_{d}_{t}_{s}.csv", out_dir)
+        save(aucs_df, f"aucs_{d}_{t}_{s}.csv", auc_dir)
     if rates:
         rate_df = pd.DataFrame([{"z": z, **v} for z, v in rates.items()])
-        save(rate_df, f"rate_{d}_{t}_{s}.csv", out_dir)
+        save(rate_df, f"rates_{d}_{t}_{s}.csv", rate_dir)
 
     timing["save_csvs"] = time.perf_counter() - t0
 
@@ -835,8 +840,20 @@ if __name__ == "__main__":
 
         # Save timing summary CSV
         if results.get("timing_records"):
-            timing_path = Path(args.out_dir) / "timing_summary.csv"
+            # Create timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+            # Build output directory
+            timing_dir = Path(args.out_dir) / "timing_summaries"
+            timing_dir.mkdir(parents=True, exist_ok=True)
+
+            # Build filename
+            filename = f"timing_summary_{args.subm_id}_{timestamp}.csv"
+            timing_path = timing_dir / filename
+
+            # Save file
             pd.DataFrame(results["timing_records"]).to_csv(timing_path, index=False)
+
             print(f"\n  Timing summary saved → {timing_path}")
 
     else:
