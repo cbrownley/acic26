@@ -49,6 +49,7 @@ import matplotlib.ticker as mticker
 from matplotlib.lines import Line2D
 from pathlib import Path
 from typing import Optional
+from datetime import datetime
 
 from config import TREATMENTS, CONTROL
 
@@ -91,9 +92,18 @@ def _apply_style():
     plt.rcParams.update(STYLE)
 
 
-def _save_or_return(fig: plt.Figure, filename: str, save_dir) -> plt.Figure:
+def _save_or_return(
+    fig: plt.Figure, base_name: str, save_dir, team_id: str, subm_id: str
+) -> plt.Figure:
+    """Helper to handle the new filename requirements."""
     if save_dir is not None:
         Path(save_dir).mkdir(parents=True, exist_ok=True)
+
+        # Generate timestamp and construct new filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        stem = Path(base_name).stem
+        filename = f"{stem}_{team_id}_{subm_id}_{timestamp}.png"
+
         path = Path(save_dir) / filename
         fig.savefig(path, dpi=150, bbox_inches="tight")
         print(f"  [VIZ] saved → {path}")
@@ -108,6 +118,8 @@ def _save_or_return(fig: plt.Figure, filename: str, save_dir) -> plt.Figure:
 def plot_icate_distributions(
     icate_df: pd.DataFrame,
     data_id: str,
+    team_id: str,
+    subm_id: str,
     save_dir=None,
 ) -> plt.Figure:
     """
@@ -162,7 +174,7 @@ def plot_icate_distributions(
     ax.legend(handles=legend_patches, loc="best")
 
     fig.tight_layout()
-    return _save_or_return(fig, f"icate_dist_{data_id}.png", save_dir)
+    return _save_or_return(fig, f"icate_dist_{data_id}.png", save_dir, team_id, subm_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -174,6 +186,8 @@ def plot_estimates_with_ci(
     scate_df: pd.DataFrame,
     pate_df: pd.DataFrame,
     data_id: str,
+    team_id: str,
+    subm_id: str,
     save_dir=None,
 ) -> plt.Figure:
     """
@@ -221,7 +235,7 @@ def plot_estimates_with_ci(
     axes[0].set_ylabel("Treatment arm")
     fig.suptitle(f"Dataset {data_id} — Average treatment effects with 95% CIs", fontsize=13, y=1.01)
     fig.tight_layout()
-    return _save_or_return(fig, f"ate_ci_{data_id}.png", save_dir)
+    return _save_or_return(fig, f"ate_ci_{data_id}.png", save_dir, team_id, subm_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -232,6 +246,8 @@ def plot_estimates_with_ci(
 def plot_subcate(
     subcate_df: pd.DataFrame,
     data_id: str,
+    team_id: str,
+    subm_id: str,
     save_dir=None,
 ) -> plt.Figure:
     """
@@ -295,7 +311,7 @@ def plot_subcate(
     ax.legend(handles=legend_handles + arm_handles, ncol=3, loc="upper right", fontsize=9)
 
     fig.tight_layout()
-    return _save_or_return(fig, f"subcate_{data_id}.png", save_dir)
+    return _save_or_return(fig, f"subcate_{data_id}.png", save_dir, team_id, subm_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -307,6 +323,8 @@ def plot_gain_curves(
     curves_dict: dict,
     aucs_dict: dict,
     data_id: str,
+    team_id: str,
+    subm_id: str,
     save_dir=None,
 ) -> plt.Figure:
     """
@@ -428,7 +446,7 @@ def plot_gain_curves(
         fontsize=12,
     )
     fig.tight_layout()
-    return _save_or_return(fig, f"gain_curves_{data_id}.png", save_dir)
+    return _save_or_return(fig, f"gain_curves_{data_id}.png", save_dir, team_id, subm_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -438,6 +456,8 @@ def plot_gain_curves(
 
 def plot_auc_heatmap(
     auc_records: list[dict],
+    team_id: str,
+    subm_id: str,
     save_dir=None,
 ) -> plt.Figure:
     """
@@ -485,7 +505,7 @@ def plot_auc_heatmap(
     ax.set_xlabel("Treatment arm")
     ax.set_ylabel("Dataset ID")
     fig.tight_layout()
-    return _save_or_return(fig, "auc_heatmap.png", save_dir)
+    return _save_or_return(fig, "auc_heatmap.png", save_dir, team_id, subm_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -495,6 +515,8 @@ def plot_auc_heatmap(
 
 def plot_scate_across_datasets(
     scate_records: list[dict],
+    team_id: str,
+    subm_id: str,
     save_dir=None,
 ) -> plt.Figure:
     """
@@ -545,7 +567,7 @@ def plot_scate_across_datasets(
     axes_flat[0].set_ylabel("Dataset")
     fig.suptitle("sCATE estimates across datasets (95% CIs)", fontsize=13, y=1.01)
     fig.tight_layout()
-    return _save_or_return(fig, "scate_across_datasets.png", save_dir)
+    return _save_or_return(fig, "scate_across_datasets.png", save_dir, team_id, subm_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -555,6 +577,8 @@ def plot_scate_across_datasets(
 
 def plot_icate_violin_grid(
     icate_dfs: dict,
+    team_id: str,
+    subm_id: str,
     save_dir=None,
 ) -> plt.Figure:
     """
@@ -620,7 +644,7 @@ def plot_icate_violin_grid(
 
     fig.suptitle("iCATE distributions — datasets × arms", fontsize=13, y=1.01)
     fig.tight_layout()
-    return _save_or_return(fig, "icate_violin_grid.png", save_dir)
+    return _save_or_return(fig, "icate_violin_grid.png", save_dir, team_id, subm_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -630,6 +654,8 @@ def plot_icate_violin_grid(
 
 def plot_pate_vs_scate(
     combined_records: list[dict],
+    team_id: str,
+    subm_id: str,
     save_dir=None,
 ) -> plt.Figure:
     """
@@ -675,7 +701,7 @@ def plot_pate_vs_scate(
 
     fig.suptitle("sCATE vs PATE across datasets\n(points near diagonal = consistent estimation)", fontsize=12, y=1.02)
     fig.tight_layout()
-    return _save_or_return(fig, "pate_vs_scate.png", save_dir)
+    return _save_or_return(fig, "pate_vs_scate.png", save_dir, team_id, subm_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -685,6 +711,8 @@ def plot_pate_vs_scate(
 
 def plot_all_single_dataset(
     data_id: str,
+    team_id: str,
+    subm_id: str,
     icate_df: pd.DataFrame,
     scate_df: pd.DataFrame,
     subcate_df: pd.DataFrame,
@@ -704,9 +732,9 @@ def plot_all_single_dataset(
     dict with keys: 'icate', 'estimates_ci', 'subcate', 'gain_curves'
     """
     figs = {}
-    figs["icate"] = plot_icate_distributions(icate_df, data_id, save_dir)
-    figs["estimates_ci"] = plot_estimates_with_ci(scate_df, pate_df, data_id, save_dir)
-    figs["subcate"] = plot_subcate(subcate_df, data_id, save_dir)
+    figs["icate"] = plot_icate_distributions(icate_df, data_id, team_id, subm_id, save_dir)
+    figs["estimates_ci"] = plot_estimates_with_ci(scate_df, pate_df, data_id, team_id, subm_id, save_dir)
+    figs["subcate"] = plot_subcate(subcate_df, data_id, team_id, subm_id, save_dir)
     if curves_dict:
-        figs["gain_curves"] = plot_gain_curves(curves_dict, aucs_dict, data_id, save_dir)
+        figs["gain_curves"] = plot_gain_curves(curves_dict, aucs_dict, data_id, team_id, subm_id, save_dir)
     return figs
