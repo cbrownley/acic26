@@ -125,7 +125,7 @@ def _timed(label: str):
 # ─────────────────────────────────────────────────────────────────────────────
 # Curated 18-dataset IDs
 # ─────────────────────────────────────────────────────────────────────────────
-CURATED_IDS = [str(i) for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]]
+CURATED_IDS = [str(i) for i in [1]]#, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -137,6 +137,7 @@ def process_dataset(
     data_id: str,
     team_id: str = config.TEAM_ID,
     subm_id: str = config.SUBM_ID,
+    run_timestamp: str = config.TIMESTAMP,
     data_dir=config.DATA_DIR,
     out_dir=config.OUT_DIR,
     plot_dir=None,
@@ -284,33 +285,31 @@ def process_dataset(
     # ── 8. Save all CSVs ──────────────────────────────────────────────────────
     print(f"\n  {'─'*56}")
     d, t, s = data_id, team_id, subm_id
+    ts = run_timestamp
     t0 = time.perf_counter()
 
-    save(icate_df, f"iCATE_{d}_{t}_{s}.csv", out_dir)
-    save(scate_df, f"sCATE_{d}_{t}_{s}.csv", out_dir)
-    save(subcate_df, f"subCATE_{d}_{t}_{s}.csv", out_dir)
-    save(pate_df, f"PATE_{d}_{t}_{s}.csv", out_dir)
-    save(best_icate_df, f"BEST_iCATE_{d}_{t}_{s}.csv", out_dir)
-    save(best_scate_df, f"BEST_sCATE_{d}_{t}_{s}.csv", out_dir)
-    save(best_subcate_df, f"BEST_subCATE_{d}_{t}_{s}.csv", out_dir)
-    save(best_pate_df, f"BEST_PATE_{d}_{t}_{s}.csv", out_dir)
+    save(icate_df, f"iCATE_{d}_{t}_{s}_{ts}.csv", out_dir)
+    save(scate_df, f"sCATE_{d}_{t}_{s}_{ts}.csv", out_dir)
+    save(subcate_df, f"subCATE_{d}_{t}_{s}_{ts}.csv", out_dir)
+    save(pate_df, f"PATE_{d}_{t}_{s}_{ts}.csv", out_dir)
+    save(best_icate_df, f"BEST_iCATE_{d}_{t}_{s}_{ts}.csv", out_dir)
+    save(best_scate_df, f"BEST_sCATE_{d}_{t}_{s}_{ts}.csv", out_dir)
+    save(best_subcate_df, f"BEST_subCATE_{d}_{t}_{s}_{ts}.csv", out_dir)
+    save(best_pate_df, f"BEST_PATE_{d}_{t}_{s}_{ts}.csv", out_dir)
 
     # Diagnostic files → sibling folders AUCs/ and RATEs/
     auc_dir = out_dir.parent / "AUCs"
     rate_dir = out_dir.parent / "RATEs"
 
-    # Generate the timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
     if aucs:
         aucs_df = pd.DataFrame([{"z": z, "AURC": v} for z, v in aucs.items()])
         # Updated filename: aucs_[dataID]_[teamID]_[submID]_[timestamp].csv
-        save(aucs_df, f"aucs_{d}_{t}_{s}_{timestamp}.csv", auc_dir)
+        save(aucs_df, f"aucs_{d}_{t}_{s}_{ts}.csv", auc_dir)
 
     if rates:
         rate_df = pd.DataFrame([{"z": z, **v} for z, v in rates.items()])
         # Updated filename: rates_[dataID]_[teamID]_[submID]_[timestamp].csv
-        save(rate_df, f"rates_{d}_{t}_{s}_{timestamp}.csv", rate_dir)
+        save(rate_df, f"rates_{d}_{t}_{s}_{ts}.csv", rate_dir)
 
     timing["save_csvs"] = time.perf_counter() - t0
 
@@ -428,6 +427,7 @@ def run_batch(
     data_ids,
     team_id: str = config.TEAM_ID,
     subm_id: str = config.SUBM_ID,
+    run_timestamp: str = config.TIMESTAMP,
     data_dir=config.DATA_DIR,
     out_dir=config.OUT_DIR,
     plot_dir=None,
@@ -464,7 +464,7 @@ def run_batch(
     for did in bar:
         bar.set_postfix({"current": did}, refresh=True)
         try:
-            r = process_dataset(did, team_id, subm_id, data_dir, out_dir, plot_dir=plot_dir, inner_n_jobs=-1)
+            r = process_dataset(did, team_id, subm_id, run_timestamp, data_dir, out_dir, plot_dir=plot_dir, inner_n_jobs=-1)
             results[did] = r
             icate_dfs[did] = r["icate"]
             auc_records.append(_make_auc_record(did, r["aucs"]))
@@ -516,7 +516,7 @@ def _worker(args: tuple) -> tuple:
     --no-bootstrap that mutated config in the main process are invisible
     to workers unless explicitly forwarded.
     """
-    data_id, team_id, subm_id, data_dir, out_dir, plot_dir, inner_n_jobs, cfg_overrides = args
+    data_id, team_id, subm_id, run_timestamp, data_dir, out_dir, plot_dir, inner_n_jobs, cfg_overrides = args
     try:
         # Apply config overrides in this worker process
         import config as _cfg
@@ -524,7 +524,7 @@ def _worker(args: tuple) -> tuple:
         for k, v in cfg_overrides.items():
             setattr(_cfg, k, v)
 
-        r = process_dataset(data_id, team_id, subm_id, data_dir, out_dir, plot_dir=plot_dir, inner_n_jobs=inner_n_jobs)
+        r = process_dataset(data_id, team_id, subm_id, run_timestamp, data_dir, out_dir, plot_dir=plot_dir, inner_n_jobs=inner_n_jobs)
         return data_id, r, None
     except Exception:
         return data_id, None, traceback.format_exc()
@@ -534,6 +534,7 @@ def run_batch_parallel(
     data_ids,
     team_id: str = config.TEAM_ID,
     subm_id: str = config.SUBM_ID,
+    run_timestamp: str = config.TIMESTAMP,
     data_dir=config.DATA_DIR,
     out_dir=config.OUT_DIR,
     plot_dir=None,
@@ -565,7 +566,7 @@ def run_batch_parallel(
     )
 
     job_args = [
-        (did, team_id, subm_id, str(data_dir), str(out_dir), str(plot_dir) if plot_dir else None, inner_jobs, overrides)
+        (did, team_id, subm_id, run_timestamp, str(data_dir), str(out_dir), str(plot_dir) if plot_dir else None, inner_jobs, overrides)
         for did in ids
     ]
 
@@ -781,6 +782,10 @@ if __name__ == "__main__":
     parser = _build_parser()
     args = parser.parse_args()
 
+    run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = Path(args.out_dir) / f"{args.team_id}_{args.subm_id}_{run_timestamp}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
     # ── Apply config overrides in the main process ────────────────────────────
     config.N_BOOT = args.n_boot
     config.N_CV_FOLDS = args.n_folds
@@ -816,6 +821,7 @@ if __name__ == "__main__":
             data_id=args.data_id,
             team_id=args.team_id,
             subm_id=args.subm_id,
+            run_timestamp=run_timestamp,
             data_dir=args.data_dir,
             out_dir=args.out_dir,
             plot_dir=args.plot_dir,
@@ -840,6 +846,7 @@ if __name__ == "__main__":
             data_ids=ids,
             team_id=args.team_id,
             subm_id=args.subm_id,
+            run_timestamp=run_timestamp,
             data_dir=args.data_dir,
             out_dir=args.out_dir,
             plot_dir=args.plot_dir,
@@ -848,15 +855,12 @@ if __name__ == "__main__":
 
         # Save timing summary CSV
         if results.get("timing_records"):
-            # Create timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
             # Build output directory
             timing_dir = Path(args.out_dir) / "timing_summaries"
             timing_dir.mkdir(parents=True, exist_ok=True)
 
             # Build filename
-            filename = f"timing_summary_{args.subm_id}_{timestamp}.csv"
+            filename = f"timing_summary_{args.subm_id}_{run_timestamp}.csv"
             timing_path = timing_dir / filename
 
             # Save file
