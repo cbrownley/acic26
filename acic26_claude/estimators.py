@@ -10,8 +10,6 @@ fit_forest_drlearner(X_feat, Y, T)
       - Double robustness from the DR orthogonalization stage
       - Non-parametric CATE flexibility from an honest causal forest
       - GRF-style CIs without bootstrap
-    It is a single, tightly integrated pipeline, unlike our current approach
-    of running DRLearner and CausalForestDML separately and averaging.
 
     Why it adds genuine diversity to the ensemble
     ----------------------------------------------
@@ -23,13 +21,6 @@ fit_forest_drlearner(X_feat, Y, T)
     Estimators 3 and 4 both use honest forests but arrive via different
     orthogonalization paths (DML vs. DR), so their errors are not perfectly
     correlated — the ensemble benefits from both.
-
-v5 fixes retained
------------------
-- discrete_treatment=True on CausalForestDML
-- LGBMClassifier as model_t
-- ClippedClassifier on all propensity models (via make_propensity_model())
-- AUTOML_BOOTSTRAP guard
 
 Public API
 ----------
@@ -171,7 +162,7 @@ def fit_causal_forest(X_feat, Y, T):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. ForestDRLearner  (DR path + honest forest, GRF CIs)  [v6]
+# 4. ForestDRLearner  (DR path + honest forest, GRF CIs)
 # ─────────────────────────────────────────────────────────────────────────────
 
 

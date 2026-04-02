@@ -26,7 +26,7 @@ out-of-sample predictions: observation i's iCATE was estimated by a model
 trained on folds ≠ fold(i).  We can therefore use all n rows for the curve
 without worrying about in-sample overfitting.
 
-Public API (unchanged from v1)
+Public API
 ------------------------------
 cv_evaluate(X_feat, Y, T)    -> (rmse_mean, rmse_std)
 
@@ -44,7 +44,7 @@ from sklearn.model_selection import cross_val_score, KFold
 from config import N_CV_FOLDS, RANDOM_STATE, CONTROL, TREATMENTS
 
 # ─────────────────────────────────────────────────────────────────────────────
-# v1 — outcome model CV RMSE  (unchanged)
+# v1 — outcome model CV RMSE
 # ─────────────────────────────────────────────────────────────────────────────
 
 

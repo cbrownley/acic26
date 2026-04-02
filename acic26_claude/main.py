@@ -122,7 +122,7 @@ def _timed(label: str):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Curated 18-dataset IDs  (update once released by organisers)
+# Curated 18-dataset IDs
 # ─────────────────────────────────────────────────────────────────────────────
 CURATED_IDS = [str(i) for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]]
 
@@ -291,9 +291,8 @@ def process_dataset(
     save(pate_df, f"PATE_{d}_{t}_{s}.csv", out_dir)
     save(best_icate_df, f"BEST_iCATE_{d}_{t}_{s}.csv", out_dir)
     save(best_scate_df, f"BEST_sCATE_{d}_{t}_{s}.csv", out_dir)
-    # NOTE: spec uses "submission_ID" (with underscore) for these two files
-    save(best_subcate_df, f"BEST_subCATE_{d}_{t}_submission_{s}.csv", out_dir)
-    save(best_pate_df, f"BEST_PATE_{d}_{t}_submission_{s}.csv", out_dir)
+    save(best_subcate_df, f"BEST_subCATE_{d}_{t}_{s}.csv", out_dir)
+    save(best_pate_df, f"BEST_PATE_{d}_{t}_{s}.csv", out_dir)
 
     if aucs:
         aucs_df = pd.DataFrame([{"z": z, "AURC": v} for z, v in aucs.items()])
