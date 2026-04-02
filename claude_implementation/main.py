@@ -314,6 +314,8 @@ def process_dataset(
         print(f"\n  [VIZ] Generating plots → {plot_dir}")
         viz.plot_all_single_dataset(
             data_id=data_id,
+            team_id=team_id,
+            subm_id=subm_id,
             icate_df=icate_df,
             scate_df=scate_df,
             subcate_df=subcate_df,
