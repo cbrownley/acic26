@@ -1,8 +1,6 @@
 """
 config.py
 All tuneable knobs in one place. Import this module everywhere.
-
-v4 changes
 ----------
 - USE_AUTOML now defaults to False. A fixed LightGBM-primary stack is
   4-6x faster than sklearn GBM and comparably accurate, removing the
@@ -16,16 +14,12 @@ v4 changes
   are cleaner, so fewer bootstrap replicates are needed to stabilise CIs.
   The linear DRL (influence-function) and CausalForest provide independent
   CI estimates that jointly anchor the variance-weighted ensemble.
-
-v5 changes  (from analysis of dr_r_cf_ensemble_var_weighted)
--------------------------------------------------------------
 - CF_DISCRETE_TREATMENT = True.  CausalForestDML's arm-vs-control contrasts
   use a 0/1 treatment indicator; setting discrete_treatment=True tells
   the forest to use a classifier for its internal propensity model instead
   of a regressor.  Omitting this flag causes the forest to fit a continuous
   regression on a binary variable, producing biased propensity scores and
   systematically over-smoothed CATE estimates.
-
 - SE_FLOOR_FACTOR = 0.1.  The per-observation inverse-variance weights in
   the ensemble use each estimator's CI width as the SE.  With MIN_SE = 1e-6
   (the prior floor), a single observation with an artificially tight
@@ -39,13 +33,14 @@ v5 changes  (from analysis of dr_r_cf_ensemble_var_weighted)
 
 from pathlib import Path
 
+# ── Competition identifiers ───────────────────────────────────────────────────
+TEAM_ID = "0020"
+SUBM_ID = "1"
+
 # ── Paths ─────────────────────────────────────────────────────────────────────
 DATA_DIR = Path("curated_data")
-OUT_DIR = Path("submissions")
+OUT_DIR = Path(f"{TEAM_ID}_{SUBM_ID}")
 
-# ── Competition identifiers ───────────────────────────────────────────────────
-TEAM_ID = "the_unconfounded"
-SUBM_ID = "1"
 
 # ── Treatment arms ────────────────────────────────────────────────────────────
 CONTROL = "a"
