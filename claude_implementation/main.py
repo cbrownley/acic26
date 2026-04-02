@@ -299,12 +299,18 @@ def process_dataset(
     auc_dir = out_dir.parent / "AUCs"
     rate_dir = out_dir.parent / "RATEs"
 
+    # Generate the timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
     if aucs:
         aucs_df = pd.DataFrame([{"z": z, "AURC": v} for z, v in aucs.items()])
-        save(aucs_df, f"aucs_{d}_{t}_{s}.csv", auc_dir)
+        # Updated filename: aucs_[dataID]_[teamID]_[submID]_[timestamp].csv
+        save(aucs_df, f"aucs_{d}_{t}_{s}_{timestamp}.csv", auc_dir)
+
     if rates:
         rate_df = pd.DataFrame([{"z": z, **v} for z, v in rates.items()])
-        save(rate_df, f"rates_{d}_{t}_{s}.csv", rate_dir)
+        # Updated filename: rates_[dataID]_[teamID]_[submID]_[timestamp].csv
+        save(rate_df, f"rates_{d}_{t}_{s}_{timestamp}.csv", rate_dir)
 
     timing["save_csvs"] = time.perf_counter() - t0
 
