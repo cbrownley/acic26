@@ -31,6 +31,7 @@ All tuneable knobs in one place. Import this module everywhere.
   observation-level adaptivity advantage over global variance weighting.
 """
 
+from datetime import datetime
 from pathlib import Path
 
 # ── Competition identifiers ───────────────────────────────────────────────────
@@ -39,8 +40,13 @@ SUBM_ID = "1"
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 DATA_DIR = Path("curated_data")
-OUT_DIR = Path(f"{TEAM_ID}_{SUBM_ID}")
 
+TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
+# Define the dynamic output directory
+# This creates a path like: submissions/0020_1_20260402_151318
+OUT_DIR = Path("submissions") / f"{TEAM_ID}_{SUBM_ID}_{TIMESTAMP}"
+# Ensure the directory exists immediately
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── Treatment arms ────────────────────────────────────────────────────────────
 CONTROL = "a"

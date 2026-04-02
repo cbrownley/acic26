@@ -38,6 +38,7 @@ claude_implementation/outdated/*
 !claude_implementation/plots/.gitkeep
 !claude_implementation/timing_summaries/.gitkeep
 !claude_implementation/outdated/.gitkeep
+!claude_implementation/submissions/.gitkeep
 
 # ======================================================
 
