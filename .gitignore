@@ -2,7 +2,7 @@
 data/inputs/curated_data/*
 data/inputs/full_data/*
 acic26_claude/curated_data/*
-claude_implementation/curated_data/*
+inverse_variance_weighted_ensemble/curated_data/*
 
 # Ignore files in outputs
 data/outputs/eda/*
@@ -13,13 +13,13 @@ data/outputs/the_unconfounded_submission4/*
 data/outputs/the_unconfounded_submission5/*
 acic26_claude/plots/*
 acic26_claude/submissions/*
-claude_implementation/plots/*
-claude_implementation/submissions/*
-claude_implementation/0020_1/*
-claude_implementation/AUCs/*
-claude_implementation/RATEs/*
-claude_implementation/timing_summaries/*
-claude_implementation/outdated/*
+inverse_variance_weighted_ensemble/plots/*
+inverse_variance_weighted_ensemble/submissions/*
+inverse_variance_weighted_ensemble/0020_1/*
+inverse_variance_weighted_ensemble/AUCs/*
+inverse_variance_weighted_ensemble/RATEs/*
+inverse_variance_weighted_ensemble/timing_summaries/*
+inverse_variance_weighted_ensemble/outdated/*
 
 # Keep the directories themselves (optional if using .gitkeep)
 !data/inputs/curated_data/.gitkeep
@@ -32,13 +32,13 @@ claude_implementation/outdated/*
 !data/outputs/the_unconfounded_submission5/.gitkeep
 !acic26_claude/plots/.gitkeep
 !acic26_claude/submissions/.gitkeep
-!claude_implementation/0020_1/.gitkeep
-!claude_implementation/AUCs/.gitkeep
-!claude_implementation/RATEs/.gitkeep
-!claude_implementation/plots/.gitkeep
-!claude_implementation/timing_summaries/.gitkeep
-!claude_implementation/outdated/.gitkeep
-!claude_implementation/submissions/.gitkeep
+!inverse_variance_weighted_ensemble/0020_1/.gitkeep
+!inverse_variance_weighted_ensemble/AUCs/.gitkeep
+!inverse_variance_weighted_ensemble/RATEs/.gitkeep
+!inverse_variance_weighted_ensemble/plots/.gitkeep
+!inverse_variance_weighted_ensemble/timing_summaries/.gitkeep
+!inverse_variance_weighted_ensemble/outdated/.gitkeep
+!inverse_variance_weighted_ensemble/submissions/.gitkeep
 
 # ======================================================
 
