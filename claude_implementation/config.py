@@ -44,7 +44,7 @@ DATA_DIR = Path("curated_data")
 TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
 # Define the dynamic output directory
 # This creates a path like: submissions/0020_1_20260402_151318
-OUT_DIR = Path("submissions") / f"{TEAM_ID}_{SUBM_ID}_{TIMESTAMP}"
+OUT_DIR = Path("submissions")
 # Ensure the directory exists immediately
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 

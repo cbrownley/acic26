@@ -95,18 +95,23 @@ def _apply_style():
 def _save_or_return(
     fig: plt.Figure, base_name: str, save_dir, team_id: str, subm_id: str
 ) -> plt.Figure:
-    """Helper to handle the new filename requirements."""
+    """Saves plots to the designated folder with the required filename format."""
     if save_dir is not None:
-        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        # Ensure the folder (e.g., 'plots/') exists
+        target_dir = Path(save_dir)
+        target_dir.mkdir(parents=True, exist_ok=True)
 
-        # Generate timestamp and construct new filename
+        # Generate the timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Construct filename: base_0020_1_20260402_152452.png
         stem = Path(base_name).stem
         filename = f"{stem}_{team_id}_{subm_id}_{timestamp}.png"
 
-        path = Path(save_dir) / filename
-        fig.savefig(path, dpi=150, bbox_inches="tight")
-        print(f"  [VIZ] saved → {path}")
+        save_path = target_dir / filename
+        fig.savefig(save_path, dpi=150, bbox_inches="tight")
+        print(f"  [VIZ] saved → {save_path}")
+
     return fig
 
 

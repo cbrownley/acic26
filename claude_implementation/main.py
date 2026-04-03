@@ -165,7 +165,12 @@ def process_dataset(
 
     data_dir = Path(data_dir)
     out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    auc_dir = Path("AUCs")
+    rate_dir = Path("RATEs")
+    plot_dir = Path(plot_dir) if plot_dir else None
+    # Ensure they exist
+    for p in [data_dir, out_dir, auc_dir, rate_dir, plot_dir]:
+        p.mkdir(parents=True, exist_ok=True)
 
     wall_start = time.perf_counter()
     timing = {}  # step_name -> elapsed seconds
@@ -299,9 +304,6 @@ def process_dataset(
     save(best_pate_df, f"BEST_PATE_{d}_{t}_{s}_{ts}.csv", out_dir)
 
     # Diagnostic files → AUCs/ and RATEs/
-    auc_dir = out_dir.parent / "AUCs"
-    rate_dir = out_dir.parent / "RATEs"
-
     if aucs:
         aucs_df = pd.DataFrame([{"z": z, "AURC": v} for z, v in aucs.items()])
         # Updated filename: aucs_[dataID]_[teamID]_[submID]_[timestamp].csv
@@ -784,8 +786,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = Path(args.out_dir)
-    run_dir.mkdir(parents=True, exist_ok=True)
 
     # ── Apply config overrides in the main process ────────────────────────────
     config.N_BOOT = args.n_boot
