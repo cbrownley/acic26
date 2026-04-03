@@ -165,6 +165,7 @@ def process_dataset(
 
     data_dir = Path(data_dir)
     out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     wall_start = time.perf_counter()
     timing = {}  # step_name -> elapsed seconds
@@ -297,7 +298,7 @@ def process_dataset(
     save(best_subcate_df, f"BEST_subCATE_{d}_{t}_{s}_{ts}.csv", out_dir)
     save(best_pate_df, f"BEST_PATE_{d}_{t}_{s}_{ts}.csv", out_dir)
 
-    # Diagnostic files → sibling folders AUCs/ and RATEs/
+    # Diagnostic files → AUCs/ and RATEs/
     auc_dir = out_dir.parent / "AUCs"
     rate_dir = out_dir.parent / "RATEs"
 
@@ -783,7 +784,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = Path(args.out_dir) / f"{args.team_id}_{args.subm_id}_{run_timestamp}"
+    run_dir = Path(args.out_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
 
     # ── Apply config overrides in the main process ────────────────────────────
@@ -856,13 +857,13 @@ if __name__ == "__main__":
         # Save timing summary CSV
         if results.get("timing_records"):
             # Build output directory
-            timing_dir = Path(args.out_dir) / "timing_summaries"
+            timing_dir = Path("timing_summaries")
             timing_dir.mkdir(parents=True, exist_ok=True)
 
             # Build filename
             filename = f"timing_summary_{args.subm_id}_{run_timestamp}.csv"
             timing_path = timing_dir / filename
-
+            
             # Save file
             pd.DataFrame(results["timing_records"]).to_csv(timing_path, index=False)
 
