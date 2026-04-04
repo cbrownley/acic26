@@ -20,8 +20,8 @@ plots/1v1b/*
 plots/1v2/*
 inverse_variance_weighted_ensemble/plots/*
 inverse_variance_weighted_ensemble/submissions/*
-inverse_variance_weighted_ensemble/0020_1/*
-inverse_variance_weighted_ensemble/0020_1b/*
+inverse_variance_weighted_ensemble/submissions/0020_1/*
+inverse_variance_weighted_ensemble/submissions/0020_1b/*
 inverse_variance_weighted_ensemble/AUCs/*
 inverse_variance_weighted_ensemble/RATEs/*
 inverse_variance_weighted_ensemble/timing_summaries/*
@@ -49,8 +49,8 @@ r_loss_super_learner/outdated/*
 !plots/.gitkeep
 !plots/1v1b/.gitkeep
 !plots/1v2/.gitkeep
-!inverse_variance_weighted_ensemble/0020_1/.gitkeep
-!inverse_variance_weighted_ensemble/0020_1b/.gitkeep
+!inverse_variance_weighted_ensemble/submissions/0020_1/.gitkeep
+!inverse_variance_weighted_ensemble/submissions/0020_1b/.gitkeep
 !inverse_variance_weighted_ensemble/AUCs/.gitkeep
 !inverse_variance_weighted_ensemble/RATEs/.gitkeep
 !inverse_variance_weighted_ensemble/plots/.gitkeep
