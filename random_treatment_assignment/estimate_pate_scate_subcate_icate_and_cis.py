@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
 from econml.dml import CausalForestDML
 from sklearn.preprocessing import LabelEncoder
 from lightgbm import LGBMRegressor, LGBMClassifier
@@ -15,9 +17,16 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
+from helper_functions import (
+    get_diff_in_means,
+    preprocess_data,
+    extract_number,
+    scate_variance_with_icates,
+)
+
 # --- Competition Configuration ---
 TEAM_ID = "0020"
-SUBMISSION_ID = "3"
+SUBMISSION_ID = "3"  # Increment this for each new submission to avoid overwriting previous results
 OUTPUT_FOLDER = f"{TEAM_ID}_{SUBMISSION_ID}"
 
 # --- Script Configuration ---
@@ -27,57 +36,10 @@ CONTROL_ARM = "a"
 N_BOOTSTRAPS = 1000  # Number of bootstrap samples for sCATE CIs
 
 
-# --- Helper Functions ---
-def get_diff_in_means(df, treatment_arm, control_arm="a"):
-    """Calculates the difference in means and its confidence interval."""
-    group_treat = df[df["z"] == treatment_arm]["y"]
-    group_control = df[df["z"] == control_arm]["y"]
-
-    if len(group_treat) < 2 or len(group_control) < 2:
-        return np.nan, np.nan, np.nan
-
-    mean_treat = group_treat.mean()
-    mean_control = group_control.mean()
-
-    n_treat = len(group_treat)
-    n_control = len(group_control)
-
-    var_treat = group_treat.var(ddof=1)
-    var_control = group_control.var(ddof=1)
-
-    estimate = mean_treat - mean_control
-    se_diff = np.sqrt(var_treat / n_treat + var_control / n_control)
-
-    if (n_treat - 1) <= 0 or (n_control - 1) <= 0:
-        return estimate, np.nan, np.nan
-
-    df_welch_num = (var_treat / n_treat + var_control / n_control) ** 2
-    df_welch_den = ((var_treat / n_treat) ** 2 / (n_treat - 1)) + ((var_control / n_control) ** 2 / (n_control - 1))
-
-    if df_welch_den == 0:
-        return estimate, np.nan, np.nan
-    df_welch = df_welch_num / df_welch_den
-
-    if np.isnan(df_welch) or df_welch <= 0:
-        return estimate, np.nan, np.nan
-
-    t_stat = t.ppf(0.975, df=df_welch)
-    return estimate, estimate - t_stat * se_diff, estimate + t_stat * se_diff
-
-
-def preprocess_data(df):
-    """One-hot encodes categorical features for modeling."""
-    X = df.drop(columns=["ID", "y", "z"])
-    X.columns = ["".join(c if c.isalnum() else "_" for c in str(x)) for x in X.columns]
-    categorical_cols = [col for col in X.columns if X[col].dtype == "object"]
-    X_processed = pd.get_dummies(X, columns=categorical_cols, drop_first=True, dtype=int)
-    return X_processed
-
-
 # --- Main Processing Loop ---
 def main():
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-    data_files = glob.glob(os.path.join(DATA_FOLDER, "*.csv"))
+    data_files = sorted(glob.glob(os.path.join(DATA_FOLDER, "*.csv")), key=extract_number)
     if not data_files:
         print(f"Error: No CSV files found in '{DATA_FOLDER}' directory.")
         return
@@ -95,52 +57,27 @@ def main():
         file_start_time = time.time()
         df = pd.read_csv(file_path)
 
-        # === subCATE ===
-        print("1. Calculating subCATE and BEST_subCATE...")
-        subcate_results = [
-            {"x": x, "z": t, "Estimate": e, "L95": l, "U95": u}
-            for x in [0, 1]
-            for t in TREATMENT_ARMS
-            for e, l, u in [get_diff_in_means(df[df["x12"] == x], t)]
-        ]
-        subcate_df = pd.DataFrame(subcate_results)
-        subcate_df.to_csv(
-            os.path.join(OUTPUT_FOLDER, f"subCATE_{padded_data_id}_{TEAM_ID}_{SUBMISSION_ID}.csv"),
-            index=False,
-        )
-        if not subcate_df.dropna().empty:
-            subcate_df.dropna().loc[subcate_df.dropna().groupby("x")["Estimate"].idxmax()].rename(
-                columns={"z": "best_z"}
-            )[["x", "best_z"]].to_csv(
-                os.path.join(
-                    OUTPUT_FOLDER,
-                    f"BEST_subCATE_{padded_data_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
-                ),
-                index=False,
-            )
+        # Identify categorical/nominal columns
+        # This selects columns with 'object' (strings) or 'category' types
+        cat_cols = df.select_dtypes(include=['object', 'category']).columns
 
-        # === PATE (Derived from subCATE for consistency) ===
-        print("2. Calculating PATE and BEST_PATE...")
-        weight_0 = (df["x12"] == 0).sum() / len(df)
-        weight_1 = (df["x12"] == 1).sum() / len(df)
+        # Remove spaces and replace with underscores
+        for col in cat_cols:
+            df[col] = df[col].str.replace(' ', '_')
+
+        # === PATE ===
+        print("1. Calculating PATE and BEST_PATE...")
+        print("PATE with Direct Difference in Means:")
+        # Method 1. PATE is calculated directly using the get_diff_in_means function, which is robust to unequal variances and sample sizes.
         pate_results = []
         for z_val in TREATMENT_ARMS:
-            # Get subCATE estimates, filling with 0 if a subgroup was empty
-            subcate_0_est = (
-                subcate_df[(subcate_df["x"] == 0) & (subcate_df["z"] == z_val)]["Estimate"].fillna(0).values[0]
-            )
-            subcate_1_est = (
-                subcate_df[(subcate_df["x"] == 1) & (subcate_df["z"] == z_val)]["Estimate"].fillna(0).values[0]
-            )
+            pate_est_direct, l95, u95 = get_diff_in_means(df, z_val)
 
-            # Point estimate is the weighted average of subCATEs
-            pate_est = (subcate_0_est * weight_0) + (subcate_1_est * weight_1)
-
-            # Confidence interval is still calculated on the full dataset
-            _, l95, u95 = get_diff_in_means(df, z_val)
-            pate_results.append({"z": z_val, "Estimate": pate_est, "L95": l95, "U95": u95})
+            # Append the directly calculated results.
+            pate_results.append({"z": z_val, "Estimate": pate_est_direct, "L95": l95, "U95": u95})
 
         pate_df = pd.DataFrame(pate_results)
+        print(pate_df)
         pate_df.to_csv(
             os.path.join(OUTPUT_FOLDER, f"PATE_{padded_data_id}_{TEAM_ID}_{SUBMISSION_ID}.csv"),
             index=False,
@@ -155,44 +92,39 @@ def main():
                 ),
                 index=False,
             )
+        print("")
 
-        # === sCATE ===
-        print("3. Calculating sCATE and BEST_sCATE...")
-        if not pate_df.empty:
-            scate_point_estimates = pate_df.set_index("z")["Estimate"]
-            bootstrap_estimates = {
-                t: [est for _ in range(N_BOOTSTRAPS) if not np.isnan(est := get_diff_in_means(resample(df), t)[0])]
-                for t in TREATMENT_ARMS
-            }
-            scate_results = [
-                {
-                    "z": t,
-                    "Estimate": scate_point_estimates.get(t),
-                    "L95": np.percentile(be, 2.5),
-                    "U95": np.percentile(be, 97.5),
-                }
-                for t, be in bootstrap_estimates.items()
-                if be
-            ]
-            scate_df = pd.DataFrame(scate_results)
-            scate_df.to_csv(
+        # === subCATE ===
+        print("2. Calculating subCATE and BEST_subCATE...")
+        print("subCATE with Direct Difference in Means:")
+        subcate_results = [
+            {"x": x, "z": t, "Estimate": e, "L95": l, "U95": u}
+            for x in [0, 1]
+            for t in TREATMENT_ARMS
+            for e, l, u in [get_diff_in_means(df[df["x12"] == x], t)]
+        ]
+        subcate_df = pd.DataFrame(subcate_results)
+        print(subcate_df)
+        subcate_df.to_csv(
+            os.path.join(
+                OUTPUT_FOLDER, f"subCATE_{padded_data_id}_{TEAM_ID}_{SUBMISSION_ID}.csv"
+            ),
+            index=False,
+        )
+        if not subcate_df.dropna().empty:
+            subcate_df.dropna().loc[
+                subcate_df.dropna().groupby("x")["Estimate"].idxmax()
+            ].rename(columns={"z": "best_z"})[["x", "best_z"]].to_csv(
                 os.path.join(
                     OUTPUT_FOLDER,
-                    f"sCATE_{padded_data_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
+                    f"BEST_subCATE_{padded_data_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
                 ),
                 index=False,
             )
-            if not scate_df.empty:
-                scate_df.loc[[scate_df["Estimate"].idxmax()]].rename(columns={"z": "best_z"})[["best_z"]].to_csv(
-                    os.path.join(
-                        OUTPUT_FOLDER,
-                        f"BEST_sCATE_{padded_data_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
-                    ),
-                    index=False,
-                )
+        print("")
 
         # === iCATE ===
-        print("4. Estimating and Adjusting iCATEs...")
+        print("3. Estimating and Adjusting iCATEs...")
         i_time = time.time()
         X_processed, Y, T_numeric = (
             preprocess_data(df),
@@ -297,20 +229,141 @@ def main():
 
         print(f"iCATE estimation and adjustment took {time.time() - i_time:.2f} seconds.")
 
+        # === sCATE ===
+        print("4. Calculating sCATE and BEST_sCATE...")
+        if not pate_df.empty:
+            scate_point_estimates = pate_df.set_index("z")["Estimate"]
+            bootstrap_estimates = {
+                t: [
+                    est
+                    for _ in range(N_BOOTSTRAPS)
+                    if not np.isnan(est := get_diff_in_means(resample(df), t)[0])
+                ]
+                for t in TREATMENT_ARMS
+            }
+            scate_results = [
+                {
+                    "z": t,
+                    "Estimate": scate_point_estimates.get(t),
+                    "L95": np.percentile(be, 2.5),
+                    "U95": np.percentile(be, 97.5),
+                }
+                for t, be in bootstrap_estimates.items()
+                if be
+            ]
+            scate_df = pd.DataFrame(scate_results)
+            print("sCATE with Bootstrap CIs:")
+            print(scate_df)
+            # scate_df.to_csv(
+            #     os.path.join(
+            #         OUTPUT_FOLDER,
+            #         f"sCATE_{padded_data_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
+            #     ),
+            #     index=False,
+            # )
+            # if not scate_df.empty:
+            #     scate_df.loc[[scate_df["Estimate"].idxmax()]].rename(
+            #         columns={"z": "best_z"}
+            #     )[["best_z"]].to_csv(
+            #         os.path.join(
+            #             OUTPUT_FOLDER,
+            #             f"BEST_sCATE_{padded_data_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
+            #         ),
+            #         index=False,
+            #     )
+            scate_results = []
+            for t in TREATMENT_ARMS:                
+                # Filter data for the current comparison
+                comparison_df = df[df['z'].isin([t, CONTROL_ARM])].copy()
+                
+                # Prepare inputs for the variance function
+                y = comparison_df['y'].values
+                d = (comparison_df['z'] == t).astype(int).values # 1 for treatment, 0 for control
+                
+                # The 'icates' term accounts for the overall heterogeneity of the treatment effect,
+                # so we use all available iCATEs.
+                icates = final_icate_df['Estimate'].values
+                
+                # Calculate the standard error using the new function
+                scate_se = scate_variance_with_icates(y, d, icates)
+                
+                # Get the point estimate for the sCATE
+                point_estimate = scate_point_estimates.get(t)
+                
+                if point_estimate is not None and not np.isnan(scate_se):
+                    # Calculate 95% CI using the new SE (z-score for 95% is ~1.96)
+                    margin_of_error = 1.96 * scate_se
+                    l95 = point_estimate - margin_of_error
+                    u95 = point_estimate + margin_of_error
+                    
+                    scate_results.append({
+                        "z": t,
+                        "Estimate": point_estimate,
+                        "L95": l95,
+                        "U95": u95,
+                    })
+
+            scate_df = pd.DataFrame(scate_results)
+            print("sCATE with iCATE-Adjusted SEs:")
+            print(scate_df)
+            
+            sCATE_filename = os.path.join(
+                OUTPUT_FOLDER,
+                f"sCATE_{padded_data_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
+            )
+            scate_df.to_csv(sCATE_filename, index=False)
+            
+            print(f"sCATE results saved to {sCATE_filename}")
+            print(scate_df)
+            
+            if not scate_df.empty:
+                best_scate_df = scate_df.loc[[scate_df["Estimate"].idxmax()]].rename(
+                    columns={"z": "best_z"}
+                )[["best_z"]]
+                
+                BEST_sCATE_filename = os.path.join(
+                    OUTPUT_FOLDER,
+                    f"BEST_sCATE_{padded_data_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
+                )
+                best_scate_df.to_csv(BEST_sCATE_filename, index=False)
+                print(f"\nBest sCATE saved to {BEST_sCATE_filename}")
+                print(best_scate_df)
+
+
         # === Final Consistency Checks ===
         print("5. Performing Final Consistency Checks...")
         # Check 5a: PATE vs Weighted subCATE
-        pate_subcate_check_df = pd.DataFrame(pate_results)
-        pate_subcate_check_df["Weighted_subCATE"] = pate_subcate_check_df[
-            "Estimate"
-        ]  # They are now equal by construction
-        pate_subcate_check_df["Difference"] = 0
-        print("\n  - Numerical Check: PATE vs. Weighted Average subCATE")
-        print(
-            pate_subcate_check_df[["z", "Estimate", "Weighted_subCATE", "Difference"]].rename(
-                columns={"Estimate": "PATE_Estimate"}
-            )
-        )
+        # 1. Calculate the weights for each subgroup based on their proportion in the data
+        try:
+            weight_x0 = len(df[df['x12'] == 0]) / len(df)
+            weight_x1 = 1.0 - weight_x0
+        except ZeroDivisionError:
+            weight_x0 = 0.5
+            weight_x1 = 0.5
+
+        print(f"Weight for subgroup x12=0: {weight_x0:.2f}")
+        print(f"Weight for subgroup x12=1: {weight_x1:.2f}\n")
+
+
+        # 2. Pivot the subCATE DataFrame for easier calculation
+        subcate_pivot = subcate_df.pivot_table(index='z', columns='x', values='Estimate')
+
+        # 3. Calculate the weighted average of subCATEs
+        subcate_pivot['Weighted_Average_subCATE'] = (subcate_pivot[0] * weight_x0) + (subcate_pivot[1] * weight_x1)
+
+        # 4. Merge with PATE estimates for comparison
+        pate_df_indexed = pate_df.set_index('z')
+        comparison_df = pate_df_indexed.join(subcate_pivot['Weighted_Average_subCATE'])
+        comparison_df = comparison_df.rename(columns={'Estimate': 'PATE_Estimate'})
+
+        # 5. Calculate the difference
+        comparison_df['Difference'] = comparison_df['PATE_Estimate'] - comparison_df['Weighted_Average_subCATE']
+
+        # 6. Select and reorder columns for the final output
+        final_df = comparison_df[['PATE_Estimate', 'Weighted_Average_subCATE', 'Difference']]
+
+        print("Consistency Check: PATE vs. Weighted Average of subCATEs")
+        print(final_df)
 
         # Check 5b: subCATE vs Adjusted Average iCATE
         final_avg_icate = (

@@ -5,6 +5,7 @@ acic26_claude/curated_data/*
 inverse_variance_weighted_ensemble/curated_data/*
 r_loss_super_learner/curated_data/*
 random_treatment_assignment/curated_data/*
+random_treatment_assignment_covariates/curated_data/*
 
 # Ignore files in outputs
 data/outputs/eda/*
@@ -35,6 +36,7 @@ r_loss_super_learner/RATEs/*
 r_loss_super_learner/timing_summaries/*
 r_loss_super_learner/outdated/*
 random_treatment_assignment/0020_3/*
+random_treatment_assignment_covariates/0020_4/*
 
 # Keep the directories themselves (optional if using .gitkeep)
 !data/inputs/curated_data/.gitkeep
@@ -67,6 +69,7 @@ random_treatment_assignment/0020_3/*
 !r_loss_super_learner/outdated/.gitkeep
 !r_loss_super_learner/submissions/.gitkeep
 !random_treatment_assignment/0020_3/.gitkeep
+!random_treatment_assignment_covariates/0020_4/.gitkeep
 
 # ======================================================
 

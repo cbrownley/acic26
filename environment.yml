@@ -23,7 +23,6 @@ dependencies:
   - catboost=1.2
   - flaml
   - shap
-  - scikit-learn-intelex
 
   # Visualization
   - matplotlib=3.8
@@ -69,3 +68,6 @@ dependencies:
       - econml
       - doubleml
       - fklearn
+      - arviz
+      - bambi
+      - pymc
