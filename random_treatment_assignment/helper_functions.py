@@ -16,9 +16,7 @@ def preprocess_data(df):
     X = df.drop(columns=["ID", "y", "z"])
     X.columns = ["".join(c if c.isalnum() else "_" for c in str(x)) for x in X.columns]
     categorical_cols = [col for col in X.columns if X[col].dtype == "object"]
-    X_processed = pd.get_dummies(
-        X, columns=categorical_cols, drop_first=True, dtype=int
-    )
+    X_processed = pd.get_dummies(X, columns=categorical_cols, drop_first=True, dtype=int)
     return X_processed
 
 
@@ -46,9 +44,7 @@ def get_diff_in_means(df, treatment_arm, control_arm="a"):
         return estimate, np.nan, np.nan
 
     df_welch_num = (var_treat / n_treat + var_control / n_control) ** 2
-    df_welch_den = ((var_treat / n_treat) ** 2 / (n_treat - 1)) + (
-        (var_control / n_control) ** 2 / (n_control - 1)
-    )
+    df_welch_den = ((var_treat / n_treat) ** 2 / (n_treat - 1)) + ((var_control / n_control) ** 2 / (n_control - 1))
 
     if df_welch_den == 0:
         return estimate, np.nan, np.nan

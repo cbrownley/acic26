@@ -113,9 +113,7 @@ def _get_rloss_weights(Y, T_str, M, est_drl, target_z):
     return weights / sum_w if sum_w > 0 else np.ones(M.shape[1]) / M.shape[1]
 
 
-def get_icates(
-    est_drl, drl_has_ci, est_lin, forests, X_feat, n, est_fdrl=None, Y=None, T=None
-):
+def get_icates(est_drl, drl_has_ci, est_lin, forests, X_feat, n, est_fdrl=None, Y=None, T=None):
     """
     Ensemble iCATEs using R-Loss weights and analytic confidence intervals.
     """

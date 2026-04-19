@@ -244,24 +244,14 @@ def process_dataset(
         t0 = time.perf_counter()
         # Pass Y and T to enable the R-Loss weight optimization
         icates, lowers, uppers, weights = get_icates(
-                est_drl, 
-                drl_has_ci, 
-                est_lin, 
-                forests, 
-                X_feat, 
-                n, 
-                forest_drl,
-                Y, 
-                T=T.astype(str)
-            )
+            est_drl, drl_has_ci, est_lin, forests, X_feat, n, forest_drl, Y, T=T.astype(str)
+        )
 
         # Expert Log: Show which models the SuperLearner is prioritizing
         # Log the optimized weights for visibility
         for z, w in weights.items():
             w_str = ", ".join([f"{val:.2f}" for val in w])
-            print(
-                f"  [ENS] Learned R-Loss Weights for {z}: [DRL, Lin, CF, FDRL] = [{w_str}]"
-            )
+            print(f"  [ENS] Learned R-Loss Weights for {z}: [DRL, Lin, CF, FDRL] = [{w_str}]")
         timing["ensemble"] = time.perf_counter() - t0
 
     # ── 5. Aggregate estimands ────────────────────────────────────────────────
@@ -478,7 +468,9 @@ def run_batch(
     for did in bar:
         bar.set_postfix({"current": did}, refresh=True)
         try:
-            r = process_dataset(did, team_id, subm_id, run_timestamp, data_dir, out_dir, plot_dir=plot_dir, inner_n_jobs=-1)
+            r = process_dataset(
+                did, team_id, subm_id, run_timestamp, data_dir, out_dir, plot_dir=plot_dir, inner_n_jobs=-1
+            )
             results[did] = r
             icate_dfs[did] = r["icate"]
             auc_records.append(_make_auc_record(did, r["aucs"]))
@@ -538,7 +530,9 @@ def _worker(args: tuple) -> tuple:
         for k, v in cfg_overrides.items():
             setattr(_cfg, k, v)
 
-        r = process_dataset(data_id, team_id, subm_id, run_timestamp, data_dir, out_dir, plot_dir=plot_dir, inner_n_jobs=inner_n_jobs)
+        r = process_dataset(
+            data_id, team_id, subm_id, run_timestamp, data_dir, out_dir, plot_dir=plot_dir, inner_n_jobs=inner_n_jobs
+        )
         return data_id, r, None
     except Exception:
         return data_id, None, traceback.format_exc()
@@ -580,7 +574,17 @@ def run_batch_parallel(
     )
 
     job_args = [
-        (did, team_id, subm_id, run_timestamp, str(data_dir), str(out_dir), str(plot_dir) if plot_dir else None, inner_jobs, overrides)
+        (
+            did,
+            team_id,
+            subm_id,
+            run_timestamp,
+            str(data_dir),
+            str(out_dir),
+            str(plot_dir) if plot_dir else None,
+            inner_jobs,
+            overrides,
+        )
         for did in ids
     ]
 
@@ -874,7 +878,7 @@ if __name__ == "__main__":
             # Build filename
             filename = f"timing_summary_{args.subm_id}_{run_timestamp}.csv"
             timing_path = timing_dir / filename
-            
+
             # Save file
             pd.DataFrame(results["timing_records"]).to_csv(timing_path, index=False)
 

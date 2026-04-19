@@ -92,9 +92,7 @@ def _apply_style():
     plt.rcParams.update(STYLE)
 
 
-def _save_or_return(
-    fig: plt.Figure, base_name: str, save_dir, team_id: str, subm_id: str
-) -> plt.Figure:
+def _save_or_return(fig: plt.Figure, base_name: str, save_dir, team_id: str, subm_id: str) -> plt.Figure:
     """Saves plots to the designated folder with the required filename format."""
     if save_dir is not None:
         # Ensure the folder (e.g., 'plots/') exists

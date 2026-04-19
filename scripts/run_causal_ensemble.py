@@ -15,7 +15,6 @@ from econml.dml import CausalForestDML
 from econml.metalearners import XLearner
 from econml.inference import BootstrapInference
 
-
 # ------------------------------------------------
 # CONFIG
 # ------------------------------------------------
@@ -28,7 +27,7 @@ OUTPUT_DIR = "../data/outputs/the_unconfounded_submission1"
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-TREATMENTS = ["b","c","d","e"]
+TREATMENTS = ["b", "c", "d", "e"]
 
 
 # ------------------------------------------------
@@ -47,7 +46,7 @@ for file in files:
     y = df["y"].values
     z = df["z"]
 
-    X = df[[f"x{i}" for i in range(1,41)]]
+    X = df[[f"x{i}" for i in range(1, 41)]]
 
     # ------------------------------------------
     # Encode treatments
@@ -65,10 +64,9 @@ for file in files:
     numeric_cols = X.select_dtypes(include=np.number).columns.tolist()
     cat_cols = X.select_dtypes(exclude=np.number).columns.tolist()
 
-    transformer = ColumnTransformer([
-        ("num","passthrough",numeric_cols),
-        ("cat",OneHotEncoder(handle_unknown="ignore"),cat_cols)
-    ])
+    transformer = ColumnTransformer(
+        [("num", "passthrough", numeric_cols), ("cat", OneHotEncoder(handle_unknown="ignore"), cat_cols)]
+    )
 
     Xp = transformer.fit_transform(X)
 
@@ -78,26 +76,15 @@ for file in files:
     # BASE MODELS
     # ------------------------------------------
 
-    model_y = LGBMRegressor(
-        n_estimators=400,
-        max_depth=6,
-        learning_rate=0.05
-    )
+    model_y = LGBMRegressor(n_estimators=400, max_depth=6, learning_rate=0.05)
 
-    model_t = LogisticRegression(
-        multi_class="multinomial",
-        max_iter=2000
-    )
+    model_t = LogisticRegression(multi_class="multinomial", max_iter=2000)
 
     # ------------------------------------------
     # DR LEARNER
     # ------------------------------------------
 
-    dr = DRLearner(
-        model_regression=model_y,
-        model_propensity=model_t,
-        cv=5
-    )
+    dr = DRLearner(model_regression=model_y, model_propensity=model_t, cv=5)
 
     dr.fit(y, T, X=Xp)
 
@@ -108,14 +95,7 @@ for file in files:
     # CAUSAL FOREST
     # ------------------------------------------
 
-    cf = CausalForestDML(
-        model_y=model_y,
-        model_t=model_t,
-        n_estimators=600,
-        min_samples_leaf=10,
-        max_depth=10,
-        cv=5
-    )
+    cf = CausalForestDML(model_y=model_y, model_t=model_t, n_estimators=600, min_samples_leaf=10, max_depth=10, cv=5)
 
     cf.fit(y, T, X=Xp)
 
@@ -126,18 +106,15 @@ for file in files:
     # X LEARNER
     # ------------------------------------------
 
-    xlearner = XLearner(
-        models=LGBMRegressor(n_estimators=400),
-        propensity_model=model_t
-    )
+    xlearner = XLearner(models=LGBMRegressor(n_estimators=400), propensity_model=model_t)
 
     xlearner.fit(y, T, X=Xp)
 
     x_cate = xlearner.effect(Xp)
 
     # X learner intervals via bootstrap
-    x_lb = x_cate - np.std(x_cate)*1.96
-    x_ub = x_cate + np.std(x_cate)*1.96
+    x_lb = x_cate - np.std(x_cate) * 1.96
+    x_ub = x_cate + np.std(x_cate) * 1.96
 
     # ------------------------------------------
     # ENSEMBLE CATE
@@ -159,24 +136,15 @@ for file in files:
 
     rows = []
 
-    for i,treat in enumerate(TREATMENTS):
+    for i, treat in enumerate(TREATMENTS):
 
         for j in range(n):
 
-            rows.append({
-                "ID":df["ID"].iloc[j],
-                "z":treat,
-                "Estimate":cate[j,i],
-                "L95":lb[j,i],
-                "U95":ub[j,i]
-            })
+            rows.append({"ID": df["ID"].iloc[j], "z": treat, "Estimate": cate[j, i], "L95": lb[j, i], "U95": ub[j, i]})
 
     ic_df = pd.DataFrame(rows)
 
-    ic_df.to_csv(
-        f"{OUTPUT_DIR}/iCATE_{dataset_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
-        index=False
-    )
+    ic_df.to_csv(f"{OUTPUT_DIR}/iCATE_{dataset_id}_{TEAM_ID}_{SUBMISSION_ID}.csv", index=False)
 
     # ------------------------------------------
     # sCATE
@@ -184,21 +152,13 @@ for file in files:
 
     scate = []
 
-    for i,treat in enumerate(TREATMENTS):
+    for i, treat in enumerate(TREATMENTS):
 
-        scate.append({
-            "z":treat,
-            "Estimate":cate[:,i].mean(),
-            "L95":lb[:,i].mean(),
-            "U95":ub[:,i].mean()
-        })
+        scate.append({"z": treat, "Estimate": cate[:, i].mean(), "L95": lb[:, i].mean(), "U95": ub[:, i].mean()})
 
     scate_df = pd.DataFrame(scate)
 
-    scate_df.to_csv(
-        f"{OUTPUT_DIR}/sCATE_{dataset_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
-        index=False
-    )
+    scate_df.to_csv(f"{OUTPUT_DIR}/sCATE_{dataset_id}_{TEAM_ID}_{SUBMISSION_ID}.csv", index=False)
 
     # ------------------------------------------
     # Subgroup CATE
@@ -206,60 +166,51 @@ for file in files:
 
     rows = []
 
-    for g in [0,1]:
+    for g in [0, 1]:
 
         idx = df["x1"] == g
 
-        for i,treat in enumerate(TREATMENTS):
+        for i, treat in enumerate(TREATMENTS):
 
-            rows.append({
-                "z":treat,
-                "x":g,
-                "Estimate":cate[idx,i].mean(),
-                "L95":lb[idx,i].mean(),
-                "U95":ub[idx,i].mean()
-            })
+            rows.append(
+                {
+                    "z": treat,
+                    "x": g,
+                    "Estimate": cate[idx, i].mean(),
+                    "L95": lb[idx, i].mean(),
+                    "U95": ub[idx, i].mean(),
+                }
+            )
 
     sub_df = pd.DataFrame(rows)
 
-    sub_df.to_csv(
-        f"{OUTPUT_DIR}/subCATE_{dataset_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
-        index=False
-    )
+    sub_df.to_csv(f"{OUTPUT_DIR}/subCATE_{dataset_id}_{TEAM_ID}_{SUBMISSION_ID}.csv", index=False)
 
     # ------------------------------------------
     # PATE
     # ------------------------------------------
 
-    scate_df.to_csv(
-        f"{OUTPUT_DIR}/PATE_{dataset_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
-        index=False
-    )
+    scate_df.to_csv(f"{OUTPUT_DIR}/PATE_{dataset_id}_{TEAM_ID}_{SUBMISSION_ID}.csv", index=False)
 
     # ------------------------------------------
     # BEST_iCATE
     # ------------------------------------------
 
-    best_idx = np.argmax(cate,axis=1)
+    best_idx = np.argmax(cate, axis=1)
     best = [TREATMENTS[i] for i in best_idx]
 
-    pd.DataFrame({
-        "ID":df["ID"],
-        "best_z":best
-    }).to_csv(
-        f"{OUTPUT_DIR}/BEST_iCATE_{dataset_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
-        index=False
+    pd.DataFrame({"ID": df["ID"], "best_z": best}).to_csv(
+        f"{OUTPUT_DIR}/BEST_iCATE_{dataset_id}_{TEAM_ID}_{SUBMISSION_ID}.csv", index=False
     )
 
     # ------------------------------------------
     # BEST_sCATE
     # ------------------------------------------
 
-    best_s = scate_df.loc[scate_df["Estimate"].idxmax(),"z"]
+    best_s = scate_df.loc[scate_df["Estimate"].idxmax(), "z"]
 
-    pd.DataFrame({"best_z":[best_s]}).to_csv(
-        f"{OUTPUT_DIR}/BEST_sCATE_{dataset_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
-        index=False
+    pd.DataFrame({"best_z": [best_s]}).to_csv(
+        f"{OUTPUT_DIR}/BEST_sCATE_{dataset_id}_{TEAM_ID}_{SUBMISSION_ID}.csv", index=False
     )
 
     # ------------------------------------------
@@ -268,27 +219,20 @@ for file in files:
 
     best_rows = []
 
-    for g in [0,1]:
+    for g in [0, 1]:
 
-        sub = sub_df[sub_df["x"]==g]
+        sub = sub_df[sub_df["x"] == g]
 
-        best_rows.append({
-            "x":g,
-            "best_z":sub.loc[sub["Estimate"].idxmax(),"z"]
-        })
+        best_rows.append({"x": g, "best_z": sub.loc[sub["Estimate"].idxmax(), "z"]})
 
-    pd.DataFrame(best_rows).to_csv(
-        f"{OUTPUT_DIR}/BEST_subCATE_{dataset_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
-        index=False
-    )
+    pd.DataFrame(best_rows).to_csv(f"{OUTPUT_DIR}/BEST_subCATE_{dataset_id}_{TEAM_ID}_{SUBMISSION_ID}.csv", index=False)
 
     # ------------------------------------------
     # BEST_PATE
     # ------------------------------------------
 
-    pd.DataFrame({"best_z":[best_s]}).to_csv(
-        f"{OUTPUT_DIR}/BEST_PATE_{dataset_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
-        index=False
+    pd.DataFrame({"best_z": [best_s]}).to_csv(
+        f"{OUTPUT_DIR}/BEST_PATE_{dataset_id}_{TEAM_ID}_{SUBMISSION_ID}.csv", index=False
     )
 
 print("All datasets completed.")

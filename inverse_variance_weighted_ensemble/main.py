@@ -467,7 +467,9 @@ def run_batch(
     for did in bar:
         bar.set_postfix({"current": did}, refresh=True)
         try:
-            r = process_dataset(did, team_id, subm_id, run_timestamp, data_dir, out_dir, plot_dir=plot_dir, inner_n_jobs=-1)
+            r = process_dataset(
+                did, team_id, subm_id, run_timestamp, data_dir, out_dir, plot_dir=plot_dir, inner_n_jobs=-1
+            )
             results[did] = r
             icate_dfs[did] = r["icate"]
             auc_records.append(_make_auc_record(did, r["aucs"]))
@@ -527,7 +529,9 @@ def _worker(args: tuple) -> tuple:
         for k, v in cfg_overrides.items():
             setattr(_cfg, k, v)
 
-        r = process_dataset(data_id, team_id, subm_id, run_timestamp, data_dir, out_dir, plot_dir=plot_dir, inner_n_jobs=inner_n_jobs)
+        r = process_dataset(
+            data_id, team_id, subm_id, run_timestamp, data_dir, out_dir, plot_dir=plot_dir, inner_n_jobs=inner_n_jobs
+        )
         return data_id, r, None
     except Exception:
         return data_id, None, traceback.format_exc()
@@ -569,7 +573,17 @@ def run_batch_parallel(
     )
 
     job_args = [
-        (did, team_id, subm_id, run_timestamp, str(data_dir), str(out_dir), str(plot_dir) if plot_dir else None, inner_jobs, overrides)
+        (
+            did,
+            team_id,
+            subm_id,
+            run_timestamp,
+            str(data_dir),
+            str(out_dir),
+            str(plot_dir) if plot_dir else None,
+            inner_jobs,
+            overrides,
+        )
         for did in ids
     ]
 
@@ -863,7 +877,7 @@ if __name__ == "__main__":
             # Build filename
             filename = f"timing_summary_{args.subm_id}_{run_timestamp}.csv"
             timing_path = timing_dir / filename
-            
+
             # Save file
             pd.DataFrame(results["timing_records"]).to_csv(timing_path, index=False)
 

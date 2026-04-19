@@ -15,8 +15,8 @@ from tqdm import tqdm
 teamID = "1"
 submissionID = "1"
 dataIDs = [f"{i:01d}" for i in range(1, 19)]
-treatments = ['b', 'c', 'd', 'e']
-control = 'a'
+treatments = ["b", "c", "d", "e"]
+control = "a"
 subgroups = [0, 1]
 x_col = "x12"
 
@@ -29,14 +29,10 @@ n_jobs = -1
 # ----------------------------
 # FAST PREPROCESSING SETUP
 # ----------------------------
-categorical_features = ['x1','x2','x3','x4','x5','x6','x7']
-numeric_features = [f'x{i}' for i in range(1, 41) if f'x{i}' not in categorical_features]
+categorical_features = ["x1", "x2", "x3", "x4", "x5", "x6", "x7"]
+numeric_features = [f"x{i}" for i in range(1, 41) if f"x{i}" not in categorical_features]
 
-encoder = OneHotEncoder(
-    drop='first',
-    sparse_output=False,
-    handle_unknown='ignore'
-)
+encoder = OneHotEncoder(drop="first", sparse_output=False, handle_unknown="ignore")
 
 feature_names = None
 
@@ -66,14 +62,9 @@ def bootstrap_cate(Y, T, X, ids, t, n_bootstrap=200, random_state=123):
     T_bin = (T == t).astype(int)
 
     dr = DRLearner(
-        model_regression=RandomForestRegressor(
-            n_estimators=200,
-            min_samples_leaf=10
-        ),
-        model_propensity=RandomForestClassifier(
-            n_estimators=200
-        ),
-        random_state=random_state
+        model_regression=RandomForestRegressor(n_estimators=200, min_samples_leaf=10),
+        model_propensity=RandomForestClassifier(n_estimators=200),
+        random_state=random_state,
     )
 
     dr.fit(Y=Y, T=T_bin, X=X)
@@ -90,14 +81,9 @@ def bootstrap_cate(Y, T, X, ids, t, n_bootstrap=200, random_state=123):
         Tb = T_bin[idx]
 
         dr_b = DRLearner(
-            model_regression=RandomForestRegressor(
-                n_estimators=200,
-                min_samples_leaf=10
-            ),
-            model_propensity=RandomForestClassifier(
-                n_estimators=200
-            ),
-            random_state=random_state
+            model_regression=RandomForestRegressor(n_estimators=200, min_samples_leaf=10),
+            model_propensity=RandomForestClassifier(n_estimators=200),
+            random_state=random_state,
         )
 
         dr_b.fit(Y=Yb, T=Tb, X=Xb)
@@ -105,8 +91,7 @@ def bootstrap_cate(Y, T, X, ids, t, n_bootstrap=200, random_state=123):
         return dr_b.effect(X=X)
 
     bootstrap_results = Parallel(n_jobs=n_jobs)(
-        delayed(one_bootstrap)(b)
-        for b in tqdm(range(n_bootstrap), desc=f"Bootstraps T={t}", leave=False)
+        delayed(one_bootstrap)(b) for b in tqdm(range(n_bootstrap), desc=f"Bootstraps T={t}", leave=False)
     )
 
     bootstrap_estimates = np.column_stack(bootstrap_results)
@@ -114,13 +99,7 @@ def bootstrap_cate(Y, T, X, ids, t, n_bootstrap=200, random_state=123):
     l95 = np.percentile(bootstrap_estimates, 2.5, axis=1)
     u95 = np.percentile(bootstrap_estimates, 97.5, axis=1)
 
-    return pd.DataFrame({
-        'ID': ids,
-        'z': t,
-        'Estimate': cate_hat,
-        'L95': l95,
-        'U95': u95
-    })
+    return pd.DataFrame({"ID": ids, "z": t, "Estimate": cate_hat, "L95": l95, "U95": u95})
 
 
 # ----------------------------
@@ -128,15 +107,12 @@ def bootstrap_cate(Y, T, X, ids, t, n_bootstrap=200, random_state=123):
 # ----------------------------
 def estimate_cates_parallel(data, X):
 
-    Y = data['y'].values
-    T = data['z'].values
-    ids = data['ID'].values
+    Y = data["y"].values
+    T = data["z"].values
+    ids = data["ID"].values
 
     results = Parallel(n_jobs=n_jobs)(
-        delayed(bootstrap_cate)(
-            Y, T, X, ids, t, n_bootstrap=n_bootstrap
-        )
-        for t in treatments
+        delayed(bootstrap_cate)(Y, T, X, ids, t, n_bootstrap=n_bootstrap) for t in treatments
     )
 
     return pd.concat(results, ignore_index=True)
@@ -152,18 +128,13 @@ def save_submission_files(dataID, iCATE_df, data):
     sCATE_rows = []
 
     for t in treatments:
-        df_t = iCATE_df[iCATE_df['z']==t]
+        df_t = iCATE_df[iCATE_df["z"] == t]
 
-        est = df_t['Estimate'].mean()
-        l95 = df_t['L95'].mean()
-        u95 = df_t['U95'].mean()
+        est = df_t["Estimate"].mean()
+        l95 = df_t["L95"].mean()
+        u95 = df_t["U95"].mean()
 
-        sCATE_rows.append({
-            'z': t,
-            'Estimate': est,
-            'L95': l95,
-            'U95': u95
-        })
+        sCATE_rows.append({"z": t, "Estimate": est, "L95": l95, "U95": u95})
 
     sCATE_df = pd.DataFrame(sCATE_rows)
 
@@ -175,22 +146,13 @@ def save_submission_files(dataID, iCATE_df, data):
 
     for t, x_val in product(treatments, subgroups):
 
-        iCATE_sub = iCATE_df[
-            (iCATE_df['z']==t) &
-            (data[x_col]==x_val)
-        ]
+        iCATE_sub = iCATE_df[(iCATE_df["z"] == t) & (data[x_col] == x_val)]
 
-        est = iCATE_sub['Estimate'].mean()
-        l95 = iCATE_sub['L95'].mean()
-        u95 = iCATE_sub['U95'].mean()
+        est = iCATE_sub["Estimate"].mean()
+        l95 = iCATE_sub["L95"].mean()
+        u95 = iCATE_sub["U95"].mean()
 
-        subCATE_rows.append({
-            'z': t,
-            'x': x_val,
-            'Estimate': est,
-            'L95': l95,
-            'U95': u95
-        })
+        subCATE_rows.append({"z": t, "x": x_val, "Estimate": est, "L95": l95, "U95": u95})
 
     subCATE_df = pd.DataFrame(subCATE_rows)
 
@@ -202,18 +164,13 @@ def save_submission_files(dataID, iCATE_df, data):
 
     for t in treatments:
 
-        df_t = iCATE_df[iCATE_df['z']==t]
+        df_t = iCATE_df[iCATE_df["z"] == t]
 
-        est = df_t['Estimate'].mean()
-        l95 = df_t['L95'].mean()
-        u95 = df_t['U95'].mean()
+        est = df_t["Estimate"].mean()
+        l95 = df_t["L95"].mean()
+        u95 = df_t["U95"].mean()
 
-        PATE_rows.append({
-            'z': t,
-            'Estimate': est,
-            'L95': l95,
-            'U95': u95
-        })
+        PATE_rows.append({"z": t, "Estimate": est, "L95": l95, "U95": u95})
 
     PATE_df = pd.DataFrame(PATE_rows)
 
@@ -225,20 +182,17 @@ def save_submission_files(dataID, iCATE_df, data):
     iCATE_df.to_csv(os.path.join(output_dir, iCATE_file), index=False)
     files.append(iCATE_file)
 
-    best_iCATE = iCATE_df.pivot(index='ID', columns='z', values='Estimate')
-    best_iCATE['best_z'] = best_iCATE[treatments].idxmax(axis=1)
+    best_iCATE = iCATE_df.pivot(index="ID", columns="z", values="Estimate")
+    best_iCATE["best_z"] = best_iCATE[treatments].idxmax(axis=1)
 
     best_iCATE_file = f"BEST_iCATE_data{dataID}_team{teamID}_{submissionID}.csv"
-    best_iCATE[['best_z']].to_csv(os.path.join(output_dir, best_iCATE_file))
+    best_iCATE[["best_z"]].to_csv(os.path.join(output_dir, best_iCATE_file))
     files.append(best_iCATE_file)
 
-    best_sCATE = sCATE_df.loc[sCATE_df['Estimate'].idxmax(),'z']
+    best_sCATE = sCATE_df.loc[sCATE_df["Estimate"].idxmax(), "z"]
     best_sCATE_file = f"BEST_sCATE_data{dataID}_team{teamID}_{submissionID}.csv"
 
-    pd.DataFrame({'best_z':[best_sCATE]}).to_csv(
-        os.path.join(output_dir, best_sCATE_file),
-        index=False
-    )
+    pd.DataFrame({"best_z": [best_sCATE]}).to_csv(os.path.join(output_dir, best_sCATE_file), index=False)
 
     files.append(best_sCATE_file)
 
@@ -246,32 +200,23 @@ def save_submission_files(dataID, iCATE_df, data):
 
     for x_val in subgroups:
 
-        df_sub = subCATE_df[subCATE_df['x']==x_val]
+        df_sub = subCATE_df[subCATE_df["x"] == x_val]
 
-        best_z = df_sub.loc[df_sub['Estimate'].idxmax(),'z']
+        best_z = df_sub.loc[df_sub["Estimate"].idxmax(), "z"]
 
-        best_sub_rows.append({
-            'x':x_val,
-            'best_z':best_z
-        })
+        best_sub_rows.append({"x": x_val, "best_z": best_z})
 
     best_sub_file = f"BEST_subCATE_data{dataID}_team{teamID}_{submissionID}.csv"
 
-    pd.DataFrame(best_sub_rows).to_csv(
-        os.path.join(output_dir, best_sub_file),
-        index=False
-    )
+    pd.DataFrame(best_sub_rows).to_csv(os.path.join(output_dir, best_sub_file), index=False)
 
     files.append(best_sub_file)
 
-    best_PATE = PATE_df.loc[PATE_df['Estimate'].idxmax(),'z']
+    best_PATE = PATE_df.loc[PATE_df["Estimate"].idxmax(), "z"]
 
     best_PATE_file = f"BEST_PATE_data{dataID}_team{teamID}_{submissionID}.csv"
 
-    pd.DataFrame({'best_z':[best_PATE]}).to_csv(
-        os.path.join(output_dir, best_PATE_file),
-        index=False
-    )
+    pd.DataFrame({"best_z": [best_PATE]}).to_csv(os.path.join(output_dir, best_PATE_file), index=False)
 
     files.append(best_PATE_file)
 
@@ -283,17 +228,13 @@ def save_submission_files(dataID, iCATE_df, data):
 # ----------------------------
 all_files = []
 
-first_data = pd.read_csv(
-    f"../data/inputs/curated_data/data_{dataIDs[0]}.csv"
-)
+first_data = pd.read_csv(f"../data/inputs/curated_data/data_{dataIDs[0]}.csv")
 
 fit_encoder_once(first_data)
 
 for dataID in tqdm(dataIDs, desc="Processing datasets"):
 
-    data = pd.read_csv(
-        f"../data/inputs/curated_data/data_{dataID}.csv"
-    )
+    data = pd.read_csv(f"../data/inputs/curated_data/data_{dataID}.csv")
 
     X = preprocess_covariates_fast_numpy(data)
 
@@ -301,9 +242,7 @@ for dataID in tqdm(dataIDs, desc="Processing datasets"):
 
     files = save_submission_files(dataID, iCATE_df, data)
 
-    all_files.extend(
-        [os.path.join(output_dir,f) for f in files]
-    )
+    all_files.extend([os.path.join(output_dir, f) for f in files])
 
 
 # ----------------------------
@@ -311,7 +250,7 @@ for dataID in tqdm(dataIDs, desc="Processing datasets"):
 # ----------------------------
 zip_filename = f"team{teamID}_submission{submissionID}.zip"
 
-with ZipFile(zip_filename,'w') as zipf:
+with ZipFile(zip_filename, "w") as zipf:
 
     for foldername, subfolders, filenames in os.walk(output_dir):
 

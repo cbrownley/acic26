@@ -63,9 +63,9 @@ def main():
         file_start_time = time.time()
         df = pd.read_csv(file_path)
 
-        covariate_names = [f'x{i}' for i in range(1, 41)]
+        covariate_names = [f"x{i}" for i in range(1, 41)]
         X_features = df[covariate_names]
-        y_target = df['y']
+        y_target = df["y"]
 
         quantitative_features = []
         binary_features = []
@@ -73,7 +73,7 @@ def main():
 
         for col in X_features.columns:
             # If a column's dtype is 'object', it's treated as categorical.
-            if X_features[col].dtype == 'object':
+            if X_features[col].dtype == "object":
                 categorical_features.append(col)
             else:
                 # For numeric columns, check if it's binary or quantitative.
@@ -92,17 +92,19 @@ def main():
         # The `remainder='passthrough'` handles them correctly after the main transformers.
         preprocessor = ColumnTransformer(
             transformers=[
-                ('quant', StandardScaler(), quantitative_features),
-                ('cat', OneHotEncoder(handle_unknown='ignore', drop='first'), categorical_features)
+                ("quant", StandardScaler(), quantitative_features),
+                ("cat", OneHotEncoder(handle_unknown="ignore", drop="first"), categorical_features),
             ],
-            remainder='passthrough'
+            remainder="passthrough",
         )
 
         # Create the full pipeline with preprocessing and the LASSO model
-        lasso_pipeline = Pipeline(steps=[
-            ('preprocessor', preprocessor),
-            ('regressor', LassoCV(cv=5, random_state=42, max_iter=10000)) # Using 5 folds for smaller sample
-        ])
+        lasso_pipeline = Pipeline(
+            steps=[
+                ("preprocessor", preprocessor),
+                ("regressor", LassoCV(cv=5, random_state=42, max_iter=10000)),  # Using 5 folds for smaller sample
+            ]
+        )
 
         # Run the pipeline
         print("\n--- Running LASSO Variable Selection ---")
@@ -110,14 +112,16 @@ def main():
         lasso_pipeline.fit(X_features, y_target)
 
         # Get the fitted LASSO model from the pipeline
-        lasso_model = lasso_pipeline.named_steps['regressor']
+        lasso_model = lasso_pipeline.named_steps["regressor"]
 
         # Get feature names after preprocessing
-        preprocessor_transformer = lasso_pipeline.named_steps['preprocessor']
+        preprocessor_transformer = lasso_pipeline.named_steps["preprocessor"]
 
         onehot_feature_names = []
         if categorical_features:
-            onehot_feature_names = preprocessor_transformer.named_transformers_['cat'].get_feature_names_out(categorical_features)
+            onehot_feature_names = preprocessor_transformer.named_transformers_["cat"].get_feature_names_out(
+                categorical_features
+            )
 
         # The passthrough features are simply the binary features, as they were not
         # transformed. This avoids the 'slice' TypeError.
@@ -135,7 +139,7 @@ def main():
         for feature_name in selected_features_encoded:
             is_categorical_child = False
             for cat_feat in categorical_features:
-                if feature_name.startswith(cat_feat + '_'):
+                if feature_name.startswith(cat_feat + "_"):
                     selected_original_features.add(cat_feat)
                     is_categorical_child = True
                     break
@@ -158,7 +162,7 @@ def main():
         print("Bambi PATE results:")
         # Preprocess the data and run the analysis
         # Create the final list of columns to keep for the Bayesian analysis
-        columns_for_bayesian_model = ['ID', 'y', 'z'] + list(selected_original_features)
+        columns_for_bayesian_model = ["ID", "y", "z"] + list(selected_original_features)
 
         # Create a new, filtered DataFrame containing only these columns
         # It's good practice to create a copy to avoid SettingWithCopyWarning
@@ -191,13 +195,9 @@ def main():
         print("2. Calculating subCATE and BEST_subCATE...")
         print("Bambi subCATE results:")
         # Preprocess the data and run the analysis
-        columns_for_bayesian_model = list(
-            dict.fromkeys(["ID", "y", "z", "x12"] + list(selected_original_features))
-        )
+        columns_for_bayesian_model = list(dict.fromkeys(["ID", "y", "z", "x12"] + list(selected_original_features)))
         filtered_df = df[columns_for_bayesian_model].copy()
-        subcate_df = get_subcates_by_filtering(
-            preprocess_data_for_bambi(filtered_df), TREATMENT_ARMS
-        )
+        subcate_df = get_subcates_by_filtering(preprocess_data_for_bambi(filtered_df), TREATMENT_ARMS)
 
         print("Generated subCATE Estimates:")
         print(subcate_df)
@@ -207,17 +207,17 @@ def main():
 
         if not subcate_df.dropna().empty:
             # Find the row with the highest estimate for each x12 group
-            best_indices = subcate_df.groupby('x')['Estimate'].idxmax()
+            best_indices = subcate_df.groupby("x")["Estimate"].idxmax()
             best_subcates_df = subcate_df.loc[best_indices].copy()
 
             # Rename 'z' to 'best_z' and select only the required columns
-            best_subcates_df.rename(columns={'z': 'best_z'}, inplace=True)
+            best_subcates_df.rename(columns={"z": "best_z"}, inplace=True)
 
             best_subcate_output_path = os.path.join(
                 OUTPUT_FOLDER,
                 f"BEST_subCATE_{padded_data_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
             )
-            best_subcates_df[['x', 'best_z']].to_csv(best_subcate_output_path, index=False)
+            best_subcates_df[["x", "best_z"]].to_csv(best_subcate_output_path, index=False)
 
         # === iCATE ===
         print("3. Estimating and Adjusting iCATEs...")
@@ -268,9 +268,7 @@ def main():
         for treat_name in TREATMENT_ARMS:
             treat_idx = int(np.where(le.classes_ == treat_name)[0][0])
             estimates = est_forest.effect(X_processed, T0=control_idx, T1=treat_idx)
-            lb, ub = est_forest.effect_interval(
-                X_processed, T0=control_idx, T1=treat_idx, alpha=0.05
-            )
+            lb, ub = est_forest.effect_interval(X_processed, T0=control_idx, T1=treat_idx, alpha=0.05)
             icate_list.append(
                 pd.DataFrame(
                     {
@@ -293,12 +291,10 @@ def main():
             .rename(columns={"Estimate": "Avg_iCATE"})
         )
 
-        adjustment_map = pd.merge(
-            subcate_df, avg_icate_by_subgroup, left_on=["x", "z"], right_on=["x12", "z"]
-        ).drop(columns=["x12"])
-        adjustment_map["adjustment"] = (
-            adjustment_map["Estimate"] - adjustment_map["Avg_iCATE"]
+        adjustment_map = pd.merge(subcate_df, avg_icate_by_subgroup, left_on=["x", "z"], right_on=["x12", "z"]).drop(
+            columns=["x12"]
         )
+        adjustment_map["adjustment"] = adjustment_map["Estimate"] - adjustment_map["Avg_iCATE"]
 
         icate_df_adjusted = pd.merge(
             icate_df_raw_merged,
@@ -313,16 +309,14 @@ def main():
         final_icate_df = icate_df_adjusted[["ID", "z", "Estimate", "L95", "U95"]]
         print("Generated iCATE Estimates.")
         final_icate_df.to_csv(
-            os.path.join(
-                OUTPUT_FOLDER, f"iCATE_{padded_data_id}_{TEAM_ID}_{SUBMISSION_ID}.csv"
-            ),
+            os.path.join(OUTPUT_FOLDER, f"iCATE_{padded_data_id}_{TEAM_ID}_{SUBMISSION_ID}.csv"),
             index=False,
         )
 
         if not final_icate_df.empty:
-            final_icate_df.loc[
-                final_icate_df.groupby("ID")["Estimate"].idxmax()
-            ].rename(columns={"z": "best_z"})[["ID", "best_z"]].to_csv(
+            final_icate_df.loc[final_icate_df.groupby("ID")["Estimate"].idxmax()].rename(columns={"z": "best_z"})[
+                ["ID", "best_z"]
+            ].to_csv(
                 os.path.join(
                     OUTPUT_FOLDER,
                     f"BEST_iCATE_{padded_data_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
@@ -330,20 +324,14 @@ def main():
                 index=False,
             )
 
-        print(
-            f"iCATE estimation and adjustment took {time.time() - i_time:.2f} seconds."
-        )
+        print(f"iCATE estimation and adjustment took {time.time() - i_time:.2f} seconds.")
 
         # === sCATE ===
         print("4. Calculating sCATE and BEST_sCATE...")
         if not pate_df.empty:
             scate_point_estimates = pate_df.set_index("z")["Estimate"]
             bootstrap_estimates = {
-                t: [
-                    est
-                    for _ in range(N_BOOTSTRAPS)
-                    if not np.isnan(est := get_diff_in_means(resample(df), t)[0])
-                ]
+                t: [est for _ in range(N_BOOTSTRAPS) if not np.isnan(est := get_diff_in_means(resample(df), t)[0])]
                 for t in TREATMENT_ARMS
             }
             scate_results = [
@@ -383,9 +371,7 @@ def main():
 
                 # Prepare inputs for the variance function
                 y = comparison_df["y"].values
-                d = (
-                    (comparison_df["z"] == t).astype(int).values
-                )  # 1 for treatment, 0 for control
+                d = (comparison_df["z"] == t).astype(int).values  # 1 for treatment, 0 for control
 
                 # The 'icates' term accounts for the overall heterogeneity of the treatment effect,
                 # so we use all available iCATEs.
@@ -423,9 +409,9 @@ def main():
             scate_df.to_csv(sCATE_filename, index=False)
 
             if not scate_df.empty:
-                best_scate_df = scate_df.loc[[scate_df["Estimate"].idxmax()]].rename(
-                    columns={"z": "best_z"}
-                )[["best_z"]]
+                best_scate_df = scate_df.loc[[scate_df["Estimate"].idxmax()]].rename(columns={"z": "best_z"})[
+                    ["best_z"]
+                ]
 
                 BEST_sCATE_filename = os.path.join(
                     OUTPUT_FOLDER,
@@ -448,14 +434,10 @@ def main():
         print(f"Weight for subgroup x12=1: {weight_x1:.2f}\n")
 
         # 2. Pivot the subCATE DataFrame for easier calculation
-        subcate_pivot = subcate_df.pivot_table(
-            index="z", columns="x", values="Estimate"
-        )
+        subcate_pivot = subcate_df.pivot_table(index="z", columns="x", values="Estimate")
 
         # 3. Calculate the weighted average of subCATEs
-        subcate_pivot["Weighted_Average_subCATE"] = (subcate_pivot[0] * weight_x0) + (
-            subcate_pivot[1] * weight_x1
-        )
+        subcate_pivot["Weighted_Average_subCATE"] = (subcate_pivot[0] * weight_x0) + (subcate_pivot[1] * weight_x1)
 
         # 4. Merge with PATE estimates for comparison
         pate_df_indexed = pate_df.set_index("z")
@@ -463,14 +445,10 @@ def main():
         comparison_df = comparison_df.rename(columns={"Estimate": "PATE_Estimate"})
 
         # 5. Calculate the difference
-        comparison_df["Difference"] = (
-            comparison_df["PATE_Estimate"] - comparison_df["Weighted_Average_subCATE"]
-        )
+        comparison_df["Difference"] = comparison_df["PATE_Estimate"] - comparison_df["Weighted_Average_subCATE"]
 
         # 6. Select and reorder columns for the final output
-        final_df = comparison_df[
-            ["PATE_Estimate", "Weighted_Average_subCATE", "Difference"]
-        ]
+        final_df = comparison_df[["PATE_Estimate", "Weighted_Average_subCATE", "Difference"]]
 
         print("Consistency Check: PATE vs. Weighted Average of subCATEs")
         print(final_df)
@@ -488,32 +466,18 @@ def main():
             left_on=["x", "z"],
             right_on=["x12", "z"],
         )
-        final_check_df["Difference"] = (
-            final_check_df["Estimate"] - final_check_df["Adjusted_Avg_iCATE"]
-        )
+        final_check_df["Difference"] = final_check_df["Estimate"] - final_check_df["Adjusted_Avg_iCATE"]
         print("\n  - Numerical Check: subCATE vs. Adjusted Average iCATE")
-        print(
-            final_check_df[["x", "z", "Estimate", "Adjusted_Avg_iCATE", "Difference"]]
-        )
+        print(final_check_df[["x", "z", "Estimate", "Adjusted_Avg_iCATE", "Difference"]])
 
         # Check 5c: PATE vs sCATE
         if not pate_df.empty and not scate_df.empty:
             print("\n  - Numerical Check 5c: PATE vs. sCATE (Point Estimates and CIs)")
-            pate_scate_comp = pd.merge(
-                pate_df, scate_df, on="z", suffixes=("_PATE", "_sCATE")
-            )
-            pate_scate_comp["Estimate_Diff"] = (
-                pate_scate_comp["Estimate_PATE"] - pate_scate_comp["Estimate_sCATE"]
-            )
-            pate_scate_comp["CI_Width_PATE"] = (
-                pate_scate_comp["U95_PATE"] - pate_scate_comp["L95_PATE"]
-            )
-            pate_scate_comp["CI_Width_sCATE"] = (
-                pate_scate_comp["U95_sCATE"] - pate_scate_comp["L95_sCATE"]
-            )
-            pate_scate_comp["CI_Width_Diff"] = (
-                pate_scate_comp["CI_Width_PATE"] - pate_scate_comp["CI_Width_sCATE"]
-            )
+            pate_scate_comp = pd.merge(pate_df, scate_df, on="z", suffixes=("_PATE", "_sCATE"))
+            pate_scate_comp["Estimate_Diff"] = pate_scate_comp["Estimate_PATE"] - pate_scate_comp["Estimate_sCATE"]
+            pate_scate_comp["CI_Width_PATE"] = pate_scate_comp["U95_PATE"] - pate_scate_comp["L95_PATE"]
+            pate_scate_comp["CI_Width_sCATE"] = pate_scate_comp["U95_sCATE"] - pate_scate_comp["L95_sCATE"]
+            pate_scate_comp["CI_Width_Diff"] = pate_scate_comp["CI_Width_PATE"] - pate_scate_comp["CI_Width_sCATE"]
 
             print(
                 pate_scate_comp[
@@ -529,9 +493,7 @@ def main():
 
         if not final_check_df.empty:
             fig, ax = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
-            fig.suptitle(
-                f"Final Consistency Check for dataID={padded_data_id}", fontsize=16
-            )
+            fig.suptitle(f"Final Consistency Check for dataID={padded_data_id}", fontsize=16)
             for i_plot, x12_val in enumerate([0, 1]):
                 plot_data = final_check_df[final_check_df["x"] == x12_val]
                 if not plot_data.empty:
@@ -560,15 +522,11 @@ def main():
                     ax[i_plot].set_title(f"Subgroup: X12 = {x12_val}")
                     ax[i_plot].legend()
             plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-            plt.savefig(
-                os.path.join(OUTPUT_FOLDER, f"consistency_check_{padded_data_id}.png")
-            )
+            plt.savefig(os.path.join(OUTPUT_FOLDER, f"consistency_check_{padded_data_id}.png"))
             plt.close(fig)
 
         print(f"File processing took {time.time() - file_start_time:.2f} seconds.")
-    print(
-        f"\n--- Total execution time: {time.time() - total_start_time:.2f} seconds ---"
-    )
+    print(f"\n--- Total execution time: {time.time() - total_start_time:.2f} seconds ---")
 
 
 if __name__ == "__main__":

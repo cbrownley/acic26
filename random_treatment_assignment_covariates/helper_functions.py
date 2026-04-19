@@ -21,9 +21,7 @@ def preprocess_data(df):
     X = df.drop(columns=["ID", "y", "z"])
     X.columns = ["".join(c if c.isalnum() else "_" for c in str(x)) for x in X.columns]
     categorical_cols = [col for col in X.columns if X[col].dtype == "object"]
-    X_processed = pd.get_dummies(
-        X, columns=categorical_cols, drop_first=True, dtype=int
-    )
+    X_processed = pd.get_dummies(X, columns=categorical_cols, drop_first=True, dtype=int)
     return X_processed
 
 
@@ -38,15 +36,11 @@ def preprocess_data_for_bambi(df):
         df = df.drop(columns=["ID"])
 
     # Set treatment as a categorical variable with 'a' as the reference level
-    df["z"] = pd.Categorical(
-        df["z"], categories=["a", "b", "c", "d", "e"], ordered=False
-    )
-    
-    cat_cols = [
-        col for col in df.columns if df.dtypes[col] == "object" and col.startswith("x")
-    ]
+    df["z"] = pd.Categorical(df["z"], categories=["a", "b", "c", "d", "e"], ordered=False)
+
+    cat_cols = [col for col in df.columns if df.dtypes[col] == "object" and col.startswith("x")]
     # print(f"Found categorical columns to convert: {cat_cols}")
-    
+
     for col in cat_cols:
         df[col] = df[col].astype("category")
 
@@ -92,17 +86,13 @@ def preprocess_data_for_bambi(df):
 #     return pd.DataFrame(results)
 
 
-def get_pate_with_bambi(
-    df: pd.DataFrame, formula: str, treatment_arms: list
-) -> pd.DataFrame:
+def get_pate_with_bambi(df: pd.DataFrame, formula: str, treatment_arms: list) -> pd.DataFrame:
     """
     Estimates PATEs for a given formula and dataframe.
     This function is assumed to be working correctly.
     """
     model = bmb.Model(formula, df)
-    idata = model.fit(
-        draws=2000, tune=1000, target_accept=0.9, cores=1, chains=4, sampler="nutpie"
-    )
+    idata = model.fit(draws=2000, tune=1000, target_accept=0.9, cores=1, chains=4, sampler="nutpie")
 
     posterior = idata.posterior
     z_coeffs = posterior["z"]
@@ -124,9 +114,7 @@ def get_subcates_by_filtering(df: pd.DataFrame, treatment_arms: list) -> pd.Data
 
     This avoids parsing complex interaction terms.
     """
-    print(
-        "--- Estimating subCATEs by running separate models for each x12 subgroup ---"
-    )
+    print("--- Estimating subCATEs by running separate models for each x12 subgroup ---")
     all_subcate_results = []
 
     # Get the list of covariates to include in the model
@@ -148,9 +136,7 @@ def get_subcates_by_filtering(df: pd.DataFrame, treatment_arms: list) -> pd.Data
 
         # 2. Call the working PATE function on the filtered data
         # The model formula now doesn't need the interaction term.
-        pate_for_subgroup = get_pate_with_bambi(
-            subgroup_df, base_formula, treatment_arms
-        )
+        pate_for_subgroup = get_pate_with_bambi(subgroup_df, base_formula, treatment_arms)
 
         # 3. Add a column to identify which subgroup these results belong to
         pate_for_subgroup["x"] = x_level
@@ -192,9 +178,7 @@ def get_pate_with_regression(df: pd.DataFrame, control_arm: str = "a") -> pd.Dat
 
     # 2. One-hot encode categorical variables
     # We select columns that are of 'object' or 'category' dtype.
-    categorical_covariates = (
-        model_df[covariate_cols].select_dtypes(include=["object", "category"]).columns
-    )
+    categorical_covariates = model_df[covariate_cols].select_dtypes(include=["object", "category"]).columns
 
     if not categorical_covariates.empty:
         # 'drop_first=True' avoids perfect multicollinearity by dropping one
@@ -208,16 +192,12 @@ def get_pate_with_regression(df: pd.DataFrame, control_arm: str = "a") -> pd.Dat
         model_df = pd.concat([model_df, dummies], axis=1)
 
         # Update the list of covariate columns to include the new dummy columns
-        covariate_cols = [
-            col for col in model_df.columns if col not in ["ID", "y", "z"]
-        ]
+        covariate_cols = [col for col in model_df.columns if col not in ["ID", "y", "z"]]
 
     # 3. Build the R-style formula for statsmodels
     # It will look like: 'y ~ C(z, Treatment('a')) + x1 + x2 + ...'
     covariates_formula = " + ".join(covariate_cols)
-    model_formula = (
-        f"y ~ C(z, Treatment(reference='{control_arm}')) + {covariates_formula}"
-    )
+    model_formula = f"y ~ C(z, Treatment(reference='{control_arm}')) + {covariates_formula}"
 
     # print("--- Using Model Formula ---")
     # print(model_formula)
@@ -238,14 +218,10 @@ def get_pate_with_regression(df: pd.DataFrame, control_arm: str = "a") -> pd.Dat
     results_df["P-value"] = model.pvalues
 
     # Filter to only include the PATEs (the coefficients for the treatments)
-    pate_results = results_df[
-        results_df.index.str.contains(f"C\(z, Treatment\(reference='{control_arm}'\)\)")
-    ]
+    pate_results = results_df[results_df.index.str.contains(f"C\(z, Treatment\(reference='{control_arm}'\)\)")]
 
     if pate_results.empty:
-        raise ValueError(
-            "Could not find treatment coefficients in model results. Check data and formula."
-        )
+        raise ValueError("Could not find treatment coefficients in model results. Check data and formula.")
 
     # Clean up the index names for a tidy output table
     pate_results.index = [idx.split("T.")[1][:-1] for idx in pate_results.index]
@@ -254,9 +230,7 @@ def get_pate_with_regression(df: pd.DataFrame, control_arm: str = "a") -> pd.Dat
     return pate_results
 
 
-def get_pate_adjusted(
-    df: pd.DataFrame, treatment_arm: str, control_arm: str = "a"
-) -> tuple[float, float, float]:
+def get_pate_adjusted(df: pd.DataFrame, treatment_arm: str, control_arm: str = "a") -> tuple[float, float, float]:
     """
     Calculates a single PATE and its CI using a covariate-adjusted OLS
     regression model for maximum statistical precision.
@@ -280,9 +254,7 @@ def get_pate_adjusted(
     model_df = df.copy()
 
     # 2. One-hot encode categorical variables
-    categorical_covariates = (
-        model_df[covariate_cols].select_dtypes(include=["object", "category"]).columns
-    )
+    categorical_covariates = model_df[covariate_cols].select_dtypes(include=["object", "category"]).columns
 
     if not categorical_covariates.empty:
         dummies = pd.get_dummies(
@@ -294,15 +266,11 @@ def get_pate_adjusted(
         model_df = pd.concat([model_df, dummies], axis=1)
 
         # Update covariate list to include new dummy columns
-        covariate_cols = [
-            col for col in model_df.columns if col not in ["ID", "y", "z"]
-        ]
+        covariate_cols = [col for col in model_df.columns if col not in ["ID", "y", "z"]]
 
     # 3. Build the R-style regression formula
     covariates_formula = " + ".join(covariate_cols)
-    model_formula = (
-        f"y ~ C(z, Treatment(reference='{control_arm}')) + {covariates_formula}"
-    )
+    model_formula = f"y ~ C(z, Treatment(reference='{control_arm}')) + {covariates_formula}"
 
     # 4. Fit the OLS model with robust standard errors
     model = smf.ols(formula=model_formula, data=model_df).fit(cov_type="HC3")
@@ -320,9 +288,7 @@ def get_pate_adjusted(
 
     except KeyError:
         print(f"Error: Could not find coefficient for treatment arm '{treatment_arm}'.")
-        print(
-            "Please check if the treatment arm exists in the data and is not the control arm."
-        )
+        print("Please check if the treatment arm exists in the data and is not the control arm.")
         print(f"Available coefficients: {model.params.index.tolist()}")
         return np.nan, np.nan, np.nan
 
@@ -341,16 +307,8 @@ def get_pate_fully_interacted(
     all_covariate_cols = [col for col in df.columns if col.startswith("x")]
 
     # Identify types
-    num_cols = (
-        df_clean[all_covariate_cols]
-        .select_dtypes(exclude=["object", "category"])
-        .columns.tolist()
-    )
-    cat_cols = (
-        df_clean[all_covariate_cols]
-        .select_dtypes(include=["object", "category"])
-        .columns.tolist()
-    )
+    num_cols = df_clean[all_covariate_cols].select_dtypes(exclude=["object", "category"]).columns.tolist()
+    cat_cols = df_clean[all_covariate_cols].select_dtypes(include=["object", "category"]).columns.tolist()
 
     # 2. Build model_df with cleaned names to ensure patsy stability
     model_df = df_clean[["y", "z"]].copy()
@@ -360,10 +318,7 @@ def get_pate_fully_interacted(
     if cat_cols:
         dummies = pd.get_dummies(df_clean[cat_cols], drop_first=True)
         # Sanitize names: remove brackets and dots
-        dummies.columns = [
-            str(c).replace("[", "_").replace("]", "_").replace(".", "_")
-            for c in dummies.columns
-        ]
+        dummies.columns = [str(c).replace("[", "_").replace("]", "_").replace(".", "_") for c in dummies.columns]
         model_df = pd.concat([model_df, dummies], axis=1)
 
     cov_cols = [c for c in model_df.columns if c not in ["y", "z"]]
@@ -371,12 +326,8 @@ def get_pate_fully_interacted(
 
     # 3. Fit the fully interacted model
     # Form: y ~ z + x1 + x2 + z:x1 + z:x2
-    main_effects = " + ".join(
-        ["C(z, Treatment(reference='" + control_arm + "'))"] + cov_cols
-    )
-    interactions = " + ".join(
-        [f"C(z, Treatment(reference='{control_arm}')):{c}" for c in cov_cols]
-    )
+    main_effects = " + ".join(["C(z, Treatment(reference='" + control_arm + "'))"] + cov_cols)
+    interactions = " + ".join([f"C(z, Treatment(reference='{control_arm}')):{c}" for c in cov_cols])
     formula = f"y ~ {main_effects} + {interactions}"
 
     model_fit = smf.ols(formula=formula, data=model_df).fit(cov_type="HC3")
@@ -423,9 +374,7 @@ def get_pate_fully_interacted(
         return float(pate_est), np.nan, np.nan
 
 
-def get_subcates_with_regression(
-    df: pd.DataFrame, subgroup_col: str, control_arm: str = "a"
-) -> pd.DataFrame:
+def get_subcates_with_regression(df: pd.DataFrame, subgroup_col: str, control_arm: str = "a") -> pd.DataFrame:
     """
     Calculates CATEs for all treatment arms across subgroups of a binary
     covariate using a single, powerful interaction model.
@@ -440,16 +389,12 @@ def get_subcates_with_regression(
         treatment arm and subgroup combination.
     """
     # 1. Identify all other covariates (excluding the subgroup column for now)
-    covariate_cols = [
-        col for col in df.columns if col.startswith("x") and col != subgroup_col
-    ]
+    covariate_cols = [col for col in df.columns if col.startswith("x") and col != subgroup_col]
 
     model_df = df.copy()
 
     # 2. One-hot encode any other categorical variables
-    categorical_covariates = (
-        model_df[covariate_cols].select_dtypes(include=["object", "category"]).columns
-    )
+    categorical_covariates = model_df[covariate_cols].select_dtypes(include=["object", "category"]).columns
 
     if not categorical_covariates.empty:
         dummies = pd.get_dummies(
@@ -459,9 +404,7 @@ def get_subcates_with_regression(
         )
         model_df = model_df.drop(columns=categorical_covariates)
         model_df = pd.concat([model_df, dummies], axis=1)
-        covariate_cols = [
-            col for col in model_df.columns if col not in ["ID", "y", "z", subgroup_col]
-        ]
+        covariate_cols = [col for col in model_df.columns if col not in ["ID", "y", "z", subgroup_col]]
 
     # 3. Build the regression formula with an interaction term
     # The '*' operator tells statsmodels to include main effects for z and the
@@ -484,9 +427,7 @@ def get_subcates_with_regression(
     for arm in treatment_arms:
         # Define the coefficient names used by statsmodels
         main_effect_coef = f"C(z, Treatment(reference='{control_arm}'))[T.{arm}]"
-        interaction_coef = (
-            f"C(z, Treatment(reference='{control_arm}'))[T.{arm}]:{subgroup_col}"
-        )
+        interaction_coef = f"C(z, Treatment(reference='{control_arm}'))[T.{arm}]:{subgroup_col}"
 
         # --- CATE for subgroup == 0 ---
         cate_0_test = model.t_test(main_effect_coef)
@@ -577,9 +518,7 @@ def get_diff_in_means(df, treatment_arm, control_arm="a"):
         return estimate, np.nan, np.nan
 
     df_welch_num = (var_treat / n_treat + var_control / n_control) ** 2
-    df_welch_den = ((var_treat / n_treat) ** 2 / (n_treat - 1)) + (
-        (var_control / n_control) ** 2 / (n_control - 1)
-    )
+    df_welch_den = ((var_treat / n_treat) ** 2 / (n_treat - 1)) + ((var_control / n_control) ** 2 / (n_control - 1))
 
     if df_welch_den == 0:
         return estimate, np.nan, np.nan

@@ -4,7 +4,8 @@ import numpy as np
 from flaml import AutoML
 from sklearn.base import BaseEstimator, clone
 import warnings
-warnings.simplefilter('ignore')
+
+warnings.simplefilter("ignore")
 ###################################
 # AutoML models
 ###################################
@@ -26,11 +27,18 @@ class AutoMLWrap(BaseEstimator):
         return self.model_.predict(X)
 
 
-def auto_reg(X, y, *, groups=None, n_splits=5, split_type='auto', time_budget=60, verbose=0):
+def auto_reg(X, y, *, groups=None, n_splits=5, split_type="auto", time_budget=60, verbose=0):
     X = np.array(X)
-    automl = AutoML(task='regression', time_budget=time_budget, early_stop=True,
-                    eval_method='cv', n_splits=n_splits, split_type=split_type,
-                    metric='mse', verbose=verbose)
+    automl = AutoML(
+        task="regression",
+        time_budget=time_budget,
+        early_stop=True,
+        eval_method="cv",
+        n_splits=n_splits,
+        split_type=split_type,
+        metric="mse",
+        verbose=verbose,
+    )
     inds = np.arange(X.shape[0])
     np.random.shuffle(inds)
     if groups is None:
@@ -54,21 +62,37 @@ class AutoMLWrapCLF(BaseEstimator):
     def predict(self, X):
         return self.model_.predict_proba(X)[:, 1]
 
+
 # By default if we use metric='mse' for a classification task, then flaml
 # will use `predict` instead of `predict_proba`. We define a custom mse
 # loss for classification.
 def clf_mse(
-        X_val, y_val, estimator, labels,
-        X_train, y_train, weight_val=None, weight_train=None,
-        *args,):
-    val_loss = np.mean((estimator.predict_proba(X_val)[:, 1] - y_val)**2)
+    X_val,
+    y_val,
+    estimator,
+    labels,
+    X_train,
+    y_train,
+    weight_val=None,
+    weight_train=None,
+    *args,
+):
+    val_loss = np.mean((estimator.predict_proba(X_val)[:, 1] - y_val) ** 2)
     return val_loss, {"val_loss": val_loss}
 
-def auto_clf(X, y, *, groups=None, n_splits=5, split_type='auto', time_budget=60, verbose=0):
+
+def auto_clf(X, y, *, groups=None, n_splits=5, split_type="auto", time_budget=60, verbose=0):
     X = np.array(X)
-    automl = AutoML(task='classification', time_budget=time_budget, early_stop=True,
-                    eval_method='cv', n_splits=n_splits, split_type=split_type,
-                    metric=clf_mse, verbose=verbose)
+    automl = AutoML(
+        task="classification",
+        time_budget=time_budget,
+        early_stop=True,
+        eval_method="cv",
+        n_splits=n_splits,
+        split_type=split_type,
+        metric=clf_mse,
+        verbose=verbose,
+    )
     inds = np.arange(X.shape[0])
     np.random.shuffle(inds)
     if groups is None:
@@ -83,24 +107,37 @@ def auto_clf(X, y, *, groups=None, n_splits=5, split_type='auto', time_budget=60
 # We want to be minimizing the loss: 1/n sum_i w_i (y_i - ypred_i)^2. The standard
 # mse with sample weights would have minimized (1/sum_i w_i) sum_i w_i (y_i - ypred_i)^2.
 def weighted_mse(
-        X_val, y_val, estimator, labels,
-        X_train, y_train, weight_val=None, weight_train=None,
-        *args,):
+    X_val,
+    y_val,
+    estimator,
+    labels,
+    X_train,
+    y_train,
+    weight_val=None,
+    weight_train=None,
+    *args,
+):
     weight_val = 1 if weight_val is None else weight_val
     weight_train = 1 if weight_train is None else weight_train
-    error = (estimator.predict(X_val) - y_val)**2
+    error = (estimator.predict(X_val) - y_val) ** 2
     val_loss = np.mean(weight_val * error)
-    error_train = (estimator.predict(X_train) - y_train)**2
+    error_train = (estimator.predict(X_train) - y_train) ** 2
     train_loss = np.mean(weight_train * error_train)
     return val_loss, {"val_loss": val_loss, "train_loss": train_loss}
 
 
-def auto_weighted_reg(X, y, *, sample_weight, groups=None, n_splits=5,  split_type='auto', time_budget=60, verbose=0):
+def auto_weighted_reg(X, y, *, sample_weight, groups=None, n_splits=5, split_type="auto", time_budget=60, verbose=0):
     X = np.array(X)
-    automl = AutoML(task='regression', time_budget=time_budget, early_stop=True,
-                    eval_method='cv',
-                    n_splits=n_splits,  split_type=split_type,
-                    metric=weighted_mse, verbose=verbose)
+    automl = AutoML(
+        task="regression",
+        time_budget=time_budget,
+        early_stop=True,
+        eval_method="cv",
+        n_splits=n_splits,
+        split_type=split_type,
+        metric=weighted_mse,
+        verbose=verbose,
+    )
     inds = np.arange(X.shape[0])
     np.random.shuffle(inds)
     if groups is None:
