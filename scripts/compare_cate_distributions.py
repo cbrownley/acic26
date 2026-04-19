@@ -71,7 +71,7 @@ def plot_comparisons(file1, file2, pair_id, out_dir=None):
         plt.close()
 
 
-is_AA_test = True  # Set to False for 1v2 comparison
+is_AA_test = False  # Set to False for 1v2 comparison
 
 current_file = Path(__file__)
 # Go up one level, then into another folder
@@ -80,15 +80,24 @@ if is_AA_test:
     folder2 = current_file.parent.parent / "inverse_variance_weighted_ensemble" / "0020_1b"
     out_dir = current_file.parent.parent / "plots" / "1v1b"
 else:
-    folder1 = current_file.parent.parent / "inverse_variance_weighted_ensemble" / "0020_1"
-    folder2 = current_file.parent.parent / "r_loss_super_learner" / "submissions" / "0020_2"
-    out_dir = current_file.parent.parent / "plots" / "1v2"
+    # folder1 = current_file.parent.parent / "inverse_variance_weighted_ensemble" / "0020_1"
+    # folder2 = current_file.parent.parent / "r_loss_super_learner" / "submissions" / "0020_2"
+    # out_dir = current_file.parent.parent / "plots" / "1v2"
+    folder1 = current_file.parent.parent / "random_treatment_assignment" / "0020_3"
+    folder2 = current_file.parent.parent / "random_treatment_assignment_covariates" / "0020_4"
+    out_dir = current_file.parent.parent / "plots" / "3vs4"
 
 for i in range(1, 19):
     if is_AA_test:
         f1 = folder1 / f"iCATE_{i}_0020_1.csv"
         f2 = folder2 / f"iCATE_{i}_0020_1.csv"
     else:
-        f1 = folder1 / f"iCATE_{i}_0020_1.csv"
-        f2 = folder2 / f"iCATE_{i}_0020_2.csv" 
+        # f1 = folder1 / f"iCATE_{i}_0020_1.csv"
+        # f2 = folder2 / f"iCATE_{i}_0020_2.csv"
+        if i < 10:
+            f1 = folder1 / f"iCATE_000{i}_0020_3.csv"
+            f2 = folder2 / f"iCATE_000{i}_0020_4.csv"
+        else:
+            f1 = folder1 / f"iCATE_00{i}_0020_3.csv"
+            f2 = folder2 / f"iCATE_00{i}_0020_4.csv"
     plot_comparisons(f1, f2, pair_id=i, out_dir=out_dir)
