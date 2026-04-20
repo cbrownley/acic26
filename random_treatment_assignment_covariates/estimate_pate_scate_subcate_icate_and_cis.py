@@ -52,7 +52,7 @@ def main():
 
     total_start_time = time.time()
 
-    for i, file_path in enumerate(data_files[1:2]):
+    for i, file_path in enumerate(data_files):
         data_id_match = re.search(r"data_(\d+)\.csv", os.path.basename(file_path))
         if not data_id_match:
             continue
