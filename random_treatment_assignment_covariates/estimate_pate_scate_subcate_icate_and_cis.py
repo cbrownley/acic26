@@ -26,7 +26,7 @@ from helper_functions import (
     preprocess_data_for_bambi,
     get_pate_with_bambi,
     get_subcates_by_filtering,
-    scate_variance_with_icates,
+    get_scate_intervals_from_pate,
     get_diff_in_means,
 )
 
@@ -52,7 +52,7 @@ def main():
 
     total_start_time = time.time()
 
-    for i, file_path in enumerate(data_files):
+    for i, file_path in enumerate(data_files[1:2]):
         data_id_match = re.search(r"data_(\d+)\.csv", os.path.basename(file_path))
         if not data_id_match:
             continue
@@ -364,54 +364,28 @@ def main():
             #         ),
             #         index=False,
             #     )
-            scate_results = []
-            for t in TREATMENT_ARMS:
-                # Filter data for the current comparison
-                comparison_df = df[df["z"].isin([t, CONTROL_ARM])].copy()
 
-                # Prepare inputs for the variance function
-                y = comparison_df["y"].values
-                d = (comparison_df["z"] == t).astype(int).values  # 1 for treatment, 0 for control
+            scate_df_final = get_scate_intervals_from_pate(
+                pate_df=pate_df,
+                final_icate_df=final_icate_df,
+                original_df=df,
+                treatment_arms=TREATMENT_ARMS,
+                control_arm=CONTROL_ARM,
+            )
 
-                # The 'icates' term accounts for the overall heterogeneity of the treatment effect,
-                # so we use all available iCATEs.
-                icates = final_icate_df["Estimate"].values
-
-                # Calculate the standard error using the new function
-                scate_se = scate_variance_with_icates(y, d, icates)
-
-                # Get the point estimate for the sCATE
-                point_estimate = scate_point_estimates.get(t)
-
-                if point_estimate is not None and not np.isnan(scate_se):
-                    # Calculate 95% CI using the new SE (z-score for 95% is ~1.96)
-                    margin_of_error = 1.96 * scate_se
-                    l95 = point_estimate - margin_of_error
-                    u95 = point_estimate + margin_of_error
-
-                    scate_results.append(
-                        {
-                            "z": t,
-                            "Estimate": point_estimate,
-                            "L95": l95,
-                            "U95": u95,
-                        }
-                    )
-
-            scate_df = pd.DataFrame(scate_results)
             print("sCATE with iCATE-Adjusted SEs:")
-            print(scate_df)
+            print(scate_df_final)
 
             sCATE_filename = os.path.join(
                 OUTPUT_FOLDER,
                 f"sCATE_{padded_data_id}_{TEAM_ID}_{SUBMISSION_ID}.csv",
             )
-            scate_df.to_csv(sCATE_filename, index=False)
+            scate_df_final.to_csv(sCATE_filename, index=False)
 
-            if not scate_df.empty:
-                best_scate_df = scate_df.loc[[scate_df["Estimate"].idxmax()]].rename(columns={"z": "best_z"})[
-                    ["best_z"]
-                ]
+            if not scate_df_final.empty:
+                best_scate_df = scate_df_final.loc[[scate_df_final["Estimate"].idxmax()]].rename(
+                    columns={"z": "best_z"}
+                )[["best_z"]]
 
                 BEST_sCATE_filename = os.path.join(
                     OUTPUT_FOLDER,
@@ -471,24 +445,34 @@ def main():
         print(final_check_df[["x", "z", "Estimate", "Adjusted_Avg_iCATE", "Difference"]])
 
         # Check 5c: PATE vs sCATE
-        if not pate_df.empty and not scate_df.empty:
+        # Now, perform the comparison with the updated DataFrame
+        if not pate_df.empty and not scate_df_final.empty:
             print("\n  - Numerical Check 5c: PATE vs. sCATE (Point Estimates and CIs)")
-            pate_scate_comp = pd.merge(pate_df, scate_df, on="z", suffixes=("_PATE", "_sCATE"))
+
+            # Merge the PATE and the new sCATE results for comparison
+            pate_scate_comp = pd.merge(pate_df, scate_df_final, on="z", suffixes=("_PATE", "_sCATE"))
+
+            # The point estimates for PATE and sCATE are identical in this method,
+            # so the difference should be zero.
             pate_scate_comp["Estimate_Diff"] = pate_scate_comp["Estimate_PATE"] - pate_scate_comp["Estimate_sCATE"]
+
+            # Calculate the width of the confidence intervals for both
             pate_scate_comp["CI_Width_PATE"] = pate_scate_comp["U95_PATE"] - pate_scate_comp["L95_PATE"]
             pate_scate_comp["CI_Width_sCATE"] = pate_scate_comp["U95_sCATE"] - pate_scate_comp["L95_sCATE"]
+
+            # Calculate the difference in CI widths. A positive value means the sCATE CI is narrower.
             pate_scate_comp["CI_Width_Diff"] = pate_scate_comp["CI_Width_PATE"] - pate_scate_comp["CI_Width_sCATE"]
 
+            print("Comparison of PATE and sCATE Confidence Intervals:")
             print(
                 pate_scate_comp[
                     [
                         "z",
-                        "Estimate_Diff",
                         "CI_Width_PATE",
                         "CI_Width_sCATE",
                         "CI_Width_Diff",
                     ]
-                ]
+                ].round(4)
             )
 
         if not final_check_df.empty:

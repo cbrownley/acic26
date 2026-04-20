@@ -460,38 +460,85 @@ def get_subcates_with_regression(df: pd.DataFrame, subgroup_col: str, control_ar
     return pd.DataFrame(results_list)
 
 
-def scate_variance_with_icates(y, d, icates):
+def get_scate_intervals_from_pate(
+    pate_df: pd.DataFrame,
+    final_icate_df: pd.DataFrame,
+    original_df: pd.DataFrame,
+    treatment_arms: list,
+    control_arm: str,
+) -> pd.DataFrame:
     """
-    Computes sCATE variance using metalearner iCATEs to reduce the 'conservative' bias.
-    y: Observed outcomes
-    d: Treatment assignment (0, 1)
-    icates: Array of individual treatment effect estimates for every unit in the sample
+    Calculates sCATE confidence intervals by adjusting PATE variance with iCATE heterogeneity.
+
+    Args:
+        pate_df: DataFrame with PATE estimates (z, Estimate, L95, U95).
+        final_icate_df: DataFrame with individual CATEs (ID, z, Estimate).
+        original_df: The original DataFrame with raw data (z column needed for sample sizes).
+        treatment_arms: A list of the names of the treatment arms.
+        control_arm: The name of the control arm.
+
+    Returns:
+        A DataFrame with sCATE estimates and their new, narrower confidence intervals.
     """
-    n = len(y)
-    n1 = np.sum(d)
-    n0 = n - n1
+    scate_results = []
 
-    # Handle cases with no units in one arm
-    if n1 == 0 or n0 == 0:
-        return np.nan
+    # Use the PATE point estimates as the sCATE point estimates
+    scate_point_estimates = pate_df.set_index("z")["Estimate"]
 
-    # 1. Standard PATE Variance (The conservative part)
-    var1 = np.var(y[d == 1], ddof=1)
-    var0 = np.var(y[d == 0], ddof=1)
-    pate_variance = (var1 / n1) + (var0 / n0)
+    for arm in treatment_arms:
+        # --- 1. Extract PATE Variance ---
+        pate_row = pate_df[pate_df["z"] == arm]
+        if pate_row.empty:
+            continue
 
-    # 2. Variance of the CATEs (Heterogeneity term)
-    # This measures how much the treatment effect varies across your sample
-    s2_tau_hat = np.var(icates, ddof=1)
+        pate_l95 = pate_row["L95"].iloc[0]
+        pate_u95 = pate_row["U95"].iloc[0]
 
-    # 3. sCATE Variance Adjustment
-    scate_variance = pate_variance - (s2_tau_hat / n)
+        # Implied PATE SEM = (Upper - Lower) / (2 * z_score)
+        # For a 95% CI, the z-score is ~1.96
+        pate_sem = (pate_u95 - pate_l95) / (2 * 1.96)
+        pate_variance = pate_sem**2
 
-    # Ensure variance doesn't accidentally become negative due to model noise
-    scate_variance = max(1e-10, scate_variance)
+        # --- 2. Estimate Effect Heterogeneity (S²_τ_hat) ---
+        icates_for_arm = final_icate_df[final_icate_df["z"] == arm]["Estimate"]
 
-    scate_se = np.sqrt(scate_variance)
-    return scate_se
+        # Ensure there are enough iCATEs to calculate variance
+        if len(icates_for_arm) < 2:
+            continue
+
+        s2_tau_hat = np.var(icates_for_arm, ddof=1)  # Use ddof=1 for sample variance
+
+        # --- 3. Calculate sCATE Variance ---
+        # Get total sample size 'n' for this specific treatment vs. control comparison
+        n = original_df[original_df["z"].isin([arm, control_arm])].shape[0]
+
+        if n == 0:
+            continue
+
+        # The core formula: V_sCATE = V_PATE - (S²_τ_hat / n)
+        scate_variance = pate_variance - (s2_tau_hat / n)
+
+        # Ensure variance is non-negative, as sampling error can sometimes make it slightly negative
+        scate_variance = max(1e-12, scate_variance)
+
+        # --- 4. Construct sCATE Confidence Intervals ---
+        scate_se = np.sqrt(scate_variance)
+        point_estimate = scate_point_estimates.get(arm)
+
+        margin_of_error = 1.96 * scate_se
+        scate_l95 = point_estimate - margin_of_error
+        scate_u95 = point_estimate + margin_of_error
+
+        scate_results.append(
+            {
+                "z": arm,
+                "Estimate": point_estimate,
+                "L95": scate_l95,
+                "U95": scate_u95,
+            }
+        )
+
+    return pd.DataFrame(scate_results)
 
 
 def get_diff_in_means(df, treatment_arm, control_arm="a"):
